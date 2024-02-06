@@ -1,5 +1,6 @@
-deepin-installer-reborn (2.7.16-1+comsta) unstable; urgency=low
+deepin-installer-reborn (2.7.17) unstable; urgency=low
 
   * ['Autobuild release-candidate: f56b33e441aa8d64438b9ac5e315bd66d17541b7']
+  * Change live cd path
 
- -- shuttle <shuttle@deepin.com>  Mon, 08 Jul 2019 14:53:12 +0000
+ -- gfdgd xi <3025613752@qq.com>  Tue, 06 Feb 2024 21:54:31 +0000

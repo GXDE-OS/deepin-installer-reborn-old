@@ -1,7 +1,7 @@
 Source: deepin-installer-reborn
 Section: utils
 Priority: extra
-Maintainer: Deepin Packages Builder <packages@deepin.com>
+Maintainer: gfdgd xi <3025613752@qq.com>, Deepin Packages Builder <packages@deepin.com>
 Build-Depends:
     cmake (>=3.1),
     debhelper (>=9),
@@ -26,7 +26,7 @@ Build-Depends:
     libdtkcore-dev,
     libdtkcore-bin
 Standards-Version: 3.9.8
-Homepage: http://www.deepin.org
+Homepage: http://www.gfdgdxi.top
 
 Package: deepin-installer-timezones
 Architecture: all
