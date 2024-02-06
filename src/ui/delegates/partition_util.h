@@ -50,7 +50,7 @@ QString GetDeviceModelAndCap(const Device::Ptr device);
 // Get device model name, disk capacity and path.
 QString GetDeviceModelCapAndPath(const Device::Ptr device);
 
-// Get device path which is mounted at /lib/live/mount/medium.
+// Get device path which is mounted at /run/live/medium.
 // It might be a partition path or a real device path.
 // Returns an empty string if not found.
 QString GetInstallerDevicePath();

@@ -38,7 +38,7 @@ const int kLabelMaxLen = 25;
 
 // Mount points of live system in use currently.
 const char kCasperMountPoint[] = "/cdrom";
-const char kLiveMountPoint[] = "/lib/live/mount/medium";
+const char kLiveMountPoint[] = "/run/live/medium";
 
 // Get distribution description at partition |path| if it contains an OS.
 QString GetOsDescription(const QString& path) {

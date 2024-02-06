@@ -65,7 +65,7 @@ const char kAutoPartArchSpecFile[] = "auto_part_%1.sh";
 // Absolute path to oem folder.
 const char kDebugOemDir[] = "/tmp/oem";
 const char kUbuntuOemDir[] = "/cdrom/oem";
-const char kDeepinOemDir[] = "/lib/live/mount/medium/oem";
+const char kDeepinOemDir[] = "/run/live/medium/oem";
 
 // Filename of oem settings
 const char kOemSettingsFilename[] = "settings.ini";
