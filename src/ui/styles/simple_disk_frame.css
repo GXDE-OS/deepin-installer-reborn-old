@@ -1,0 +1,63 @@
+/** Used in SimpleDiskFrame class **/
+
+QScrollArea#scroll_area,
+QFrame#grid_wrapper {
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+QLabel#tip_label {
+  color: #ff8000;
+  font-size: 12px;
+}
+
+QLabel#device_model {
+  color: #e1e1e1;
+  font-size: 14px;
+}
+
+QScrollArea, QFrame#grid_wrapper {
+  background: transparent;
+}
+
+#msg_label {
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+
+#check_box {
+  color: white;
+  background: transparent;
+}
+
+#check_box::indicator {
+  width: 16px;
+  height: 16px;
+}
+
+#check_box::indicator:unchecked {
+  image: url(":/images/checkbox_unchecked.svg");
+}
+
+#check_box::indicator:unchecked:hover {
+  image: url(":/images/checkbox_unchecked_hover.svg");
+}
+
+#check_box::indicator:unchecked:pressed {
+  image: url(":/images/checkbox_unchecked_pressed.svg");
+}
+
+#check_box::indicator:checked {
+  image: url(":/images/checkbox_checked.svg");
+}
+
+#check_box::indicator:checked:hover {
+  image: url(":/images/checkbox_checked_hover.svg");
+}
+
+#check_box::indicator:checked:pressed {
+  image: url(":/images/checkbox_checked_pressed.svg");
+}

@@ -1,0 +1,73 @@
+Source: deepin-installer-reborn
+Section: utils
+Priority: extra
+Maintainer: Deepin Packages Builder <packages@deepin.com>
+Build-Depends:
+    cmake (>=3.1),
+    debhelper (>=9),
+    dh-systemd,
+    g++ (>=6.3.0),
+    gettext,
+    libattr1-dev,
+    libparted-dev,
+    libqt5x11extras5-dev,
+    libx11-dev,
+    libxext-dev,
+    libxrandr-dev,
+    libxss-dev,
+    libxtst-dev,
+    pkg-config,
+    qt5-qmake,
+    qtbase5-dev,
+    qttools5-dev,
+    qttools5-dev-tools,
+    zlib1g-dev,
+    libqt5svg5-dev,
+    libdtkcore-dev,
+    libdtkcore-bin
+Standards-Version: 3.9.8
+Homepage: http://www.deepin.org
+
+Package: deepin-installer-timezones
+Architecture: all
+Depends:
+    ${shlibs:Depends},
+    ${misc:Depends}
+Description: Language package for timezone names
+ Installer language package for timezone names
+
+Package: deepin-installer
+Architecture: any
+Depends:
+    ${shlibs:Depends},
+    ${misc:Depends},
+    btrfs-progs [i386 amd64],
+    deepin-installer-timezones,
+    dosfstools,
+    imagemagick [i386 amd64],
+    imageworsener [!i386 !amd64],
+    jfsutils [i386 amd64],
+    mtools,
+    ntfs-3g,
+    os-prober [i386 amd64],
+    parted,
+    pciutils,
+    reiserfsprogs [i386 amd64],
+    squashfs-tools,
+    tshark [i386 amd64],
+    udev,
+    x11-xserver-utils,
+    xfsprogs [i386 amd64],
+    xinit,
+    xkb-data
+Description: Release version of deepin installer
+ New version of deepin-installer, rewritten with Qt5.
+
+Package: deepin-installer-oem
+Architecture: any
+Depends:
+    ${shlibs:Depends},
+    ${misc:Depends},
+    deepin-installer
+Description: OEM tool
+ OEM tool for deepin-installer

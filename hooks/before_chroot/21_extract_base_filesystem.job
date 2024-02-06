@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# Copyright (C) 2017 ~ 2018 Deepin Technology Co., Ltd.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+CDROM=$(installer_get "CDROM")
+DI_LOCALE=$(installer_get "DI_LOCALE")
+LIVE_FILESYSTEM=$(installer_get "LIVE_FILESYSTEM")
+LIVE=$(installer_get "LIVE")
+
+L=${DI_LOCALE%.*}
+
+# Extract all overlay modules.
+extract_overlay_filesystem() {
+  case ${L} in
+    zh_CN)
+      MODULE="${CDROM}/overlay/filesystem.zh-hans.module"
+      ;;
+    zh_*)
+      MODULE="${CDROM}/overlay/filesystem.zh-hant.module"
+      ;;
+    *)
+      MODULE="${CDROM}/overlay/filesystem.en-us.module"
+      ;;
+  esac
+
+  if [ -f ${MODULE} ]; then
+    for file in $(cat ${MODULE}); do
+      deepin-installer-unsquashfs --dest /target ${CDROM}/overlay/${file} \
+        1>/dev/null || error "unsquashfs failed: ${CDROM}/overlay/${file}"
+    done
+  fi
+}
+
+# First, extract base filesystem
+readonly PROGRESS_FILE="/dev/shm/unsquashfs_progress"
+readonly BASE_MODULE="${LIVE_FILESYSTEM}/filesystem.squashfs"
+deepin-installer-unsquashfs --dest /target --progress "${PROGRESS_FILE}" \
+  "${BASE_MODULE}" 1>/dev/null || \
+  error "installer-unsquashfs failed, ${BASE_MODULE}"
+
+# Then extract overlay_filesystem
+extract_overlay_filesystem
+
+return 0

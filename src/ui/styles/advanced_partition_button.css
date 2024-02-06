@@ -1,0 +1,84 @@
+/** Used in AdvancedPartitionButton class */
+
+#advanced_partition_button {
+  border: none;
+  outline: none;
+}
+
+#advanced_partition_button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#advanced_partition_button:checked {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#name_label {
+  color: #ffffff;
+  font-size: 16px;
+}
+
+#path_label,
+#usage_label {
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+#mount_point_label,
+#fs_label {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+#tip_label {
+  color: #ff8000;
+  font-size: 14px;
+}
+
+#control_button_wrapper {
+  background: transparent;
+}
+
+#control_button,
+#control_button:active {
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+#control_button[ctlState="delete"] {
+  border-image: url(":/images/partition_delete_normal.svg");
+}
+
+#control_button[ctlState="delete"]:hover {
+  border-image: url(":/images/partition_delete_hover.svg");
+}
+
+#control_button[ctlState="delete"]:press {
+  border-image: url(":/images/partition_delete_press.svg");
+}
+
+#control_button[ctlState="edit"] {
+  border-image: url(":/images/edit_normal.svg");
+}
+
+#control_button[ctlState="edit"]:hover {
+  border-image: url(":/images/edit_hover.svg");
+}
+
+#control_button[ctlState="edit"]:press {
+  border-image: url(":/images/edit_press.svg");
+}
+
+#control_button[ctlState="new"] {
+  border-image: url(":/images/partition_new_normal.svg");
+}
+
+#control_button[ctlState="new"]:hover {
+  border-image: url(":/images/partition_new_hover.svg");
+}
+
+#control_button[ctlState="new"]:press {
+  border-image: url(":/images/partition_new_press.svg");
+}

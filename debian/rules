@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+include /usr/share/dpkg/default.mk
+export QT_SELECT=qt5
+
+# Startup with `systemd` on x86 architectures.
+# Startup with `systemd` on non-x86 architectures.
+ifneq (,$(filter i386 amd64,$(DEB_HOST_ARCH_CPU)))
+use_systemd := off
+else ifneq (,$(filter mipsel mips64el arm arm64,$(DEB_HOST_ARCH_CPU)))
+use_systemd := off
+else
+use_systemd = off
+endif
+
+%:
+	dh $@  --parallel --with systemd
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		 -DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DUSE_SYSTEMD=$(use_systemd) \
+		-DVERSION=$(DEB_VERSION_UPSTREAM)
+
+override_dh_systemd_start:
+	dh_systemd_start --no-start
+
+override_dh_fixperms:
+	dh_fixperms
+	find debian -name '*.job' -exec chmod 755 {} \;
+	find debian -name '*.sh' -exec chmod 755 {} \;
+	find debian -name 'genfstab' -exec chmod 755 {} \;
+
