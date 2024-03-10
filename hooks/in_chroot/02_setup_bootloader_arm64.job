@@ -237,4 +237,9 @@ EOF
 #  rm -f $IGNORE_UEFI
 #fi
 
+# 写入 startup.nsh 以便在 UEFI Shell 可以正常启动
+if [[ ! -f /boot/efi/startup.nsh ]]; then
+	echo "\\EFI\\boot\\grubaa64.efi" >> /boot/efi/startup.nsh
+fi
+
 /usr/sbin/update-grub
