@@ -368,6 +368,10 @@ bool IgnoreUEFI(const DeviceList& devices) {
 }
 
 bool IsEfiEnabled() {
+  // 优先通过 ISO 的配置脚本判断
+  if(QFile::exists("/gxde-efi-boot")){
+      return true;
+  }
   return QDir("/sys/firmware/efi").exists();
 }
 
