@@ -70,8 +70,6 @@ format_part(){
       mkfs.vfat -F16 -n "$part_label" "$part_path";;
     ntfs)
       mkfs.ntfs --fast -L "$part_label" "$part_path";;
-    xfs)
-      mkfs.xfs -n "$part_label" "$part_path";;
     linux-swap)
       mkswap "$part_path";;
     ext4)

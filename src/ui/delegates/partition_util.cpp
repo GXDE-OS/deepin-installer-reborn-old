@@ -351,8 +351,10 @@ int GetPartitionUsageValue(const Partition::Ptr partition) {
 }
 
 bool IgnoreUEFI(const DeviceList& devices) {
+  // Support Ventoy
+  return !IsEfiEnabled();
   // Check in UEFI mode or not.
-  if (IsEfiEnabled()) {
+  /*if (IsEfiEnabled()) {
     for (const Device::Ptr device : devices) {
       // Check partition table type.
       if (device->table != PartitionTableType::GPT) {
@@ -364,14 +366,10 @@ bool IgnoreUEFI(const DeviceList& devices) {
       }
     }
   }
-  return false;
+  return false;*/
 }
 
 bool IsEfiEnabled() {
-  // 优先通过 ISO 的配置脚本判断
-  if(QFile::exists("/gxde-efi-boot")){
-      return true;
-  }
   return QDir("/sys/firmware/efi").exists();
 }
 
