@@ -1,3 +1,10 @@
+deepin-installer-reborn (2.7.19gxde1) UNRELEASED; urgency=medium
+
+  * Use dtk5
+  * 
+
+ -- gfdgd_xi <3025613752@qq.com>  Sat, 20 Apr 2024 17:28:24 +0800
+
 deepin-installer-reborn (2.7.19) unstable; urgency=low
 
   * ['Autobuild release-candidate: f56b33e441aa8d64438b9ac5e315bd66d17541b7']

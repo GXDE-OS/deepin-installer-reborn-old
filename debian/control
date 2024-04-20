@@ -22,8 +22,8 @@ Build-Depends:
     qttools5-dev-tools,
     zlib1g-dev,
     libqt5svg5-dev,
-    libdtkcore2-dev,
-    libdtkcore-bin
+    libdtkcore-dev,
+    libdtkcore5-bin
 Standards-Version: 3.9.8
 Homepage: http://www.gfdgdxi.top
 
