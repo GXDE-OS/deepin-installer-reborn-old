@@ -127,3 +127,15 @@ is_arm64() {
       ;;
   esac
 }
+
+# Check whether current platform is loongarch64 or not.
+is_loongarch64() {
+  case $(uname -m) in
+    loongarch64 | loong64)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
