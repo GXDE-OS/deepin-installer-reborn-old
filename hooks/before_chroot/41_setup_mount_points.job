@@ -52,3 +52,7 @@ mount --bind /var/run /target/var/run || error "Failed to bind /var/run"
 # Mount /tmp/.X11-unix/
 mkdir -p /target/tmp/.X11-unix
 mount --bind /tmp/.X11-unix/ /target/tmp/.X11-unix || error "Failed to bind /tmp/.X11-unix"
+if is_loongarch64; then
+  mount --bind /sys/firmware/efi/efivars/ /target/sys/firmware/efi/efivars/ || error "Failed to bind /sys/firmware/efi/efivars/"
+fi
+
