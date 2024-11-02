@@ -1,7 +1,7 @@
-Source: deepin-installer-reborn
+Source: gxde-installer-reborn
 Section: utils
 Priority: extra
-Maintainer: gfdgd xi <3025613752@qq.com>, Deepin Packages Builder <packages@deepin.com>
+Maintainer: gfdgd xi <3025613752@qq.com>
 Build-Depends:
     cmake (>=3.1),
     debhelper (>=9),
@@ -22,26 +22,30 @@ Build-Depends:
     qttools5-dev-tools,
     zlib1g-dev,
     libqt5svg5-dev,
-    libdtkcore2-dev,
+    libdtkcore-dev,
     libdtkcore-bin
 Standards-Version: 3.9.8
 Homepage: http://www.gfdgdxi.top
 
-Package: deepin-installer-timezones
+Package: gxde-installer-timezones
 Architecture: all
 Depends:
     ${shlibs:Depends},
     ${misc:Depends}
+Provides:
+    deepin-installer-timezones
+Conflicts:
+    deepin-installer-timezones
 Description: Language package for timezone names
  Installer language package for timezone names
 
-Package: deepin-installer
+Package: gxde-installer
 Architecture: any
 Depends:
     ${shlibs:Depends},
     ${misc:Depends},
     btrfs-progs [i386 amd64],
-    deepin-installer-timezones,
+    gxde-installer-timezones,
     dosfstools,
     imagemagick [i386 amd64],
     imageworsener [!i386 !amd64],
@@ -61,13 +65,13 @@ Depends:
     xkb-data,
     grub-efi
 Description: Release version of deepin installer
- New version of deepin-installer, rewritten with Qt5.
+ New version of gxde-installer, rewritten with Qt5.
 
-Package: deepin-installer-oem
+Package: gxde-installer-oem
 Architecture: any
 Depends:
     ${shlibs:Depends},
     ${misc:Depends},
-    deepin-installer
+    gxde-installer
 Description: OEM tool
- OEM tool for deepin-installer
+ OEM tool for gxde-installer
