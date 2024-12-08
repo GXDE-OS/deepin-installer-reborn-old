@@ -63,7 +63,7 @@ Depends:
     xfsprogs [i386 amd64],
     xinit,
     xkb-data,
-    grub-efi
+    grub-efi [!mips64el]
 Description: Release version of deepin installer
  New version of gxde-installer, rewritten with Qt5.
 
