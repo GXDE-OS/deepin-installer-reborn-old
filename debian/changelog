@@ -1,10 +1,11 @@
-gxde-installer-reborn (2.7.22) UNRELEASED; urgency=medium
+gxde-installer-reborn (2.7.23) UNRELEASED; urgency=medium
 
   * Use dtk5
   * 调整依赖
   * 修改构建依赖
+  * 调整文案
 
- -- gfdgd_xi <3025613752@qq.com>  Fri, 06 Feb 2026 19:58:24 +0800
+ -- gfdgd_xi <3025613752@qq.com>  Wed, 25 Feb 2026 11:10:09 +0800
 
 gxde-installer-reborn (2.7.19) unstable; urgency=low
 
