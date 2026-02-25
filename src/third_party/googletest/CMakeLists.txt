@@ -5,7 +5,7 @@
 # ctest.  You can select which tests to run using 'ctest -R regex'.
 # For more options, run 'ctest --help'.
 
-cmake_minimum_required(VERSION 2.6.2)
+cmake_minimum_required(VERSION 3.10)
 
 project(googletest)
 
@@ -49,7 +49,7 @@ endif()
 # ${gtest_BINARY_DIR}.
 # Language "C" is required for find_package(Threads).
 project(gtest CXX C)
-cmake_minimum_required(VERSION 2.6.2)
+cmake_minimum_required(VERSION 3.10)
 
 if (COMMAND set_up_hermetic_build)
   set_up_hermetic_build()
