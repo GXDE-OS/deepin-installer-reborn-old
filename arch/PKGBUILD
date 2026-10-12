@@ -1,0 +1,49 @@
+# Maintainer: CharOfString <root@charofstring.cc>
+pkgname=gxde-installer-timezones-git
+pkgver=2.7.23
+pkgrel=1
+pkgdesc='Translated timezone names from the GXDE installer'
+arch=('any')
+url="https://gitee.com/GXDE-OS/deepin-installer-reborn"
+license=('GPL-3.0-or-later')
+makedepends=('git' 'gettext')
+provides=('gxde-installer-timezones' 'deepin-installer-timezones')
+conflicts=('gxde-installer-timezones' 'deepin-installer-timezones')
+source=()
+sha512sums=()
+
+# 本仓库同时是完整的系统安装器；与 GXDE 的桌面构建相同，这里只打包与架构无关的时区翻译
+# This repository is also the full OS installer; like GXDE's desktop builds,
+# only the architecture-independent timezone translations are packaged.
+
+# 直接使用 PKGBUILD 所在的 git 仓库作为源码 ・ Build from the git checkout this PKGBUILD lives in.
+_srcroot() {
+  git -C "$startdir" rev-parse --show-toplevel
+}
+
+# 与 CMake 中 gettext_process_po_files 的输出相同，语言列表取自其 SUBDIRS
+# Same output as CMake's gettext_process_po_files, with the language list
+# taken from its SUBDIRS.
+_tzdir() {
+  echo "$(_srcroot)/src/third_party/timezones"
+}
+
+_langs() {
+  sed -n '/^SUBDIRS(/,/)/p' "$(_tzdir)/CMakeLists.txt" | tr -d '()' | sed 's/SUBDIRS//' | xargs
+}
+
+build() {
+  local _l
+  for _l in $(_langs); do
+    mkdir -p mo/$_l
+    msgfmt -o mo/$_l/deepin-installer-timezones.mo "$(_tzdir)/$_l/deepin-installer-timezones.po"
+  done
+}
+
+package() {
+  local _l
+  for _l in $(_langs); do
+    install -Dm644 mo/$_l/deepin-installer-timezones.mo \
+      "$pkgdir/usr/share/locale/$_l/LC_MESSAGES/deepin-installer-timezones.mo"
+  done
+}
