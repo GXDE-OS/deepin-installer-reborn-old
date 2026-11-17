@@ -1,5 +1,5 @@
 # Maintainer: CharOfString <root@charofstring.cc>
-pkgname=gxde-installer-timezones-git
+pkgname=gxde-installer-timezones
 pkgver=2.7.23
 pkgrel=1
 pkgdesc='Translated timezone names from the GXDE installer'
@@ -7,8 +7,9 @@ arch=('any')
 url="https://gitee.com/GXDE-OS/deepin-installer-reborn"
 license=('GPL-3.0-or-later')
 makedepends=('git' 'gettext')
-provides=('gxde-installer-timezones' 'deepin-installer-timezones')
-conflicts=('gxde-installer-timezones' 'deepin-installer-timezones')
+provides=('deepin-installer-timezones' "gxde-installer-timezones-git=$pkgver")
+conflicts=('deepin-installer-timezones' 'gxde-installer-timezones-git')
+replaces=('gxde-installer-timezones-git')
 source=()
 sha512sums=()
 
