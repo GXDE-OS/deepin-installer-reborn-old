@@ -5,7 +5,7 @@
 #include "global_shortcut.h"
 
 #include <QDebug>
-#include <QX11Info>
+#include "../../base/x11_info.h"
 #include <X11/Xlib.h>
 
 #include "keyboard_event_filter.h"
@@ -16,7 +16,7 @@ KeyboardEventFilter* g_event_filter = nullptr;
 
 // Convert Qt key to native key code
 quint32 nativeKeyCode(Qt::Key key) {
-  Display* display = QX11Info::display();
+  Display* display = X11Info::display();
   Q_ASSERT(display);
 
   const char* keyname;

@@ -6,7 +6,7 @@
 
 #include <QAbstractEventDispatcher>
 #include <QDebug>
-#include <QX11Info>
+#include "../../base/x11_info.h"
 #include <xcb/xcb.h>
 #include <X11/Xlib.h>
 
@@ -72,12 +72,12 @@ bool KeyboardEventFilter::nativeEventFilter(const QByteArray& event_type,
 
 bool KeyboardEventFilter::registerShortcut(quint32 nativeKey,
                                            quint32 nativeMods) {
-  Display* display = QX11Info::display();
+  Display* display = X11Info::display();
   if (!display) {
     qWarning() << "registerShortcut() display is null";
     return false;
   }
-  Window window = QX11Info::appRootWindow();
+  Window window = X11Info::appRootWindow();
   Bool owner = True;
   int pointer = GrabModeAsync;
   int keyboard = GrabModeAsync;
@@ -93,9 +93,9 @@ bool KeyboardEventFilter::registerShortcut(quint32 nativeKey,
 
 bool KeyboardEventFilter::unregisterShortcut(quint32 nativeKey,
                                              quint32 nativeMods) {
-  Display* display = QX11Info::display();
+  Display* display = X11Info::display();
   Q_ASSERT(display);
-  Window window = QX11Info::appRootWindow();
+  Window window = X11Info::appRootWindow();
   g_grab_ungrab_error = false;
   auto original_x_errhandler = XSetErrorHandler(qxt_x_errhandler);
   XUngrabKey(display, nativeKey, nativeMods, window);

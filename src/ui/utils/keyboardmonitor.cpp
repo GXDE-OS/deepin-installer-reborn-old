@@ -26,7 +26,7 @@
 #include "keyboardmonitor.h"
 
 #include <QDebug>
-#include <QX11Info>
+#include "base/x11_info.h"
 
 #include <X11/X.h>
 #include <X11/XKBlib.h>
@@ -167,7 +167,7 @@ bool KeyboardMonitor::isCapslockOn()
 {
     bool            result;
     unsigned int    n = 0;
-    static Display *d = QX11Info::display();
+    static Display *d = X11Info::display();
 
     XkbGetIndicatorState(d, XkbUseCoreKbd, &n);
     result = (n & 0x01) != 0;
@@ -179,7 +179,7 @@ bool KeyboardMonitor::isNumlockOn()
 {
     bool            result;
     unsigned int    n = 0;
-    static Display *d = QX11Info::display();
+    static Display *d = X11Info::display();
 
     XkbGetIndicatorState(d, XkbUseCoreKbd, &n);
     result = (n & 0x02) != 0;
@@ -189,7 +189,7 @@ bool KeyboardMonitor::isNumlockOn()
 
 bool KeyboardMonitor::setNumlockStatus(const bool &on)
 {
-    Display *d = QX11Info::display();
+    Display *d = X11Info::display();
 
     bool result =
         XkbLockModifiers(d, XkbUseCoreKbd, Mod2Mask, on ? Mod2Mask : 0);

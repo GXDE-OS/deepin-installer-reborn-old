@@ -27,7 +27,7 @@
 #define KEYBOARDMONITOR_H
 
 #include <QThread>
-#include <QX11Info>
+#include "base/x11_info.h"
 
 namespace installer {
 
