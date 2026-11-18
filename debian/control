@@ -3,25 +3,24 @@ Section: utils
 Priority: extra
 Maintainer: gfdgd xi <3025613752@qq.com>
 Build-Depends:
-    cmake (>=3.1),
+    cmake (>= 3.18),
     debhelper (>=9),
     g++ (>=6.3.0),
     gettext,
     libattr1-dev,
     libparted-dev,
-    libqt5x11extras5-dev,
     libx11-dev,
     libxext-dev,
     libxrandr-dev,
     libxss-dev,
     libxtst-dev,
     pkg-config,
-    qt5-qmake,
-    qtbase5-dev,
-    qttools5-dev,
-    qttools5-dev-tools,
+    qt6-5compat-dev,
+    qt6-base-dev,
+    qt6-l10n-tools,
+    qt6-svg-dev,
+    qt6-tools-dev,
     zlib1g-dev,
-    libqt5svg5-dev,
     libdtkcore-dev,
     libdtkcore2-bin
 Standards-Version: 3.9.8
@@ -65,7 +64,7 @@ Depends:
     xkb-data,
     grub-efi [!mips64el]
 Description: Release version of deepin installer
- New version of gxde-installer, rewritten with Qt5.
+ New version of gxde-installer, rewritten with Qt6.
 
 Package: gxde-installer-oem
 Architecture: any

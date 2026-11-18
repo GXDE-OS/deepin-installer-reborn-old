@@ -19,3 +19,5 @@ usr/share/deepin-installer/tools/*
 usr/share/doc/*
 usr/share/icons/hicolor/scalable/apps/deepin-installer.svg
 usr/share/polkit-1/actions/*
+usr/share/qtermwidget6/kb-layouts/*
+usr/share/qtermwidget6/color-schemes/*

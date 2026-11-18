@@ -24,17 +24,17 @@ sudo aptitude install \
     gettext \
     libattr1-dev \
     libparted-dev \
-    libqt5x11extras5-dev \
     libx11-dev \
     libxext-dev \
     libxrandr-dev \
     libxss-dev \
     libxtst-dev \
     pkg-config \
-    qt5-qmake \
-    qt5-default \
-    qtbase5-dev \
-    qttools5-dev-tools \
+    qt6-5compat-dev \
+    qt6-base-dev \
+    qt6-l10n-tools \
+    qt6-svg-dev \
+    qt6-tools-dev \
     zlib1g-dev \
     btrfs-progs \
     dosfstools \
