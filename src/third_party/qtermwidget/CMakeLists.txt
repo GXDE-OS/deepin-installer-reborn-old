@@ -1,54 +1,27 @@
-cmake_minimum_required(VERSION 3.10.2 FATAL_ERROR)
+# Vendored copy of qtermwidget 2.4.0 (https://github.com/lxqt/qtermwidget).
+# Slimmed down for a static build inside deepin-installer: no lxqt-build-tools,
+# no pkg-config file, no example/python bindings. Data files (kb-layouts and
+# color-schemes) are installed to ${CMAKE_INSTALL_DATADIR}/qtermwidget6 and
+# loaded from there at runtime (upstream dropped the bundled .qrc resources).
+cmake_minimum_required(VERSION 3.18.0 FATAL_ERROR)
 
-project(qtermwidget)
+project(qtermwidget VERSION 2.4.0)
 
 include(GNUInstallDirs)
+include(GenerateExportHeader)
 include(CheckFunctionExists)
 
-option(BUILD_TEST "Build test application. Default OFF." OFF)
-# just change version for releases
-set(QTERMWIDGET_VERSION_MAJOR "0")
-set(QTERMWIDGET_VERSION_MINOR "7")
-set(QTERMWIDGET_VERSION_PATCH "1")
-
-set(QTERMWIDGET_VERSION "${QTERMWIDGET_VERSION_MAJOR}.${QTERMWIDGET_VERSION_MINOR}.${QTERMWIDGET_VERSION_PATCH}")
-
-# additional cmake files
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
-
-include_directories(
-    "${CMAKE_SOURCE_DIR}/lib"
-    "${CMAKE_BINARY_DIR}/lib"
-    "${CMAKE_BINARY_DIR}"
-)
-
-set(QTERMWIDGET_LIBRARY_NAME qtermwidget5)
-
 option(USE_UTF8PROC "Use libutf8proc for better Unicode support. Default OFF" OFF)
-
 if(USE_UTF8PROC)
-    find_package(Utf8Proc)
+    find_package(Utf8Proc REQUIRED)
 endif()
 
-if (UTF8PROC_FOUND)
-    add_definitions(-DHAVE_UTF8PROC)
-    include_directories("${UTF8PROC_INCLUDE_DIRS}")
-endif()
+set(QTERMWIDGET_LIBRARY_NAME qtermwidget6)
 
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-find_package(PkgConfig REQUIRED)
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Widgets REQUIRED)
-
-add_definitions("-DBUNDLE_KEYBOARDLAYOUTS")
-add_definitions("-DBUNDLE_COLORSCHEMES")
-
-# main library
 set(SRCS
     lib/BlockArray.cpp
     lib/ColorScheme.cpp
@@ -56,6 +29,7 @@ set(SRCS
     lib/Filter.cpp
     lib/History.cpp
     lib/HistorySearch.cpp
+    lib/Hyperlink.cpp
     lib/KeyboardTranslator.cpp
     lib/konsole_wcwidth.cpp
     lib/kprocess.cpp
@@ -75,17 +49,12 @@ set(SRCS
     lib/Vt102Emulation.cpp
 )
 
-set(UI_FILES lib/SearchBar.ui)
-
-set(QRC_FILES
-    lib/kb-layouts/kb-layouts.qrc
-    lib/color-schemes/color-schemes.qrc)
-
-# Only the Headers that need to be moc'd go here
+# Only the headers that need to be moc'd go here.
 set(HDRS
     lib/Emulation.h
     lib/Filter.h
     lib/HistorySearch.h
+    lib/Hyperlink.h
     lib/kprocess.h
     lib/kptydevice.h
     lib/kptyprocess.h
@@ -98,52 +67,56 @@ set(HDRS
     lib/Vt102Emulation.h
 )
 
-# for distribution
-set(HDRS_DISTRIB
-    lib/qtermwidget.h
-    lib/Filter.h
-)
+set(UI_FILES lib/SearchBar.ui)
 
-#| Defines
-add_definitions(-DHAVE_POSIX_OPENPT -DHAVE_SYS_TIME_H)
-if(APPLE)
-    add_definitions(-DHAVE_UTMPX -D_UTMPX_COMPAT)
-endif()
+# Data dirs, kept in sync with the install rules below.
+set(KB_LAYOUT_DIR "${CMAKE_INSTALL_FULL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/kb-layouts")
+set(COLORSCHEMES_DIR "${CMAKE_INSTALL_FULL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/color-schemes")
+set(TRANSLATIONS_DIR "${CMAKE_INSTALL_FULL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/translations")
+
+add_definitions("-DHAVE_POSIX_OPENPT" "-DHAVE_SYS_TIME_H")
 CHECK_FUNCTION_EXISTS(updwtmpx HAVE_UPDWTMPX)
 if(HAVE_UPDWTMPX)
-    add_definitions(-DHAVE_UPDWTMPX)
+    add_definitions("-DHAVE_UPDWTMPX")
 endif()
-
-set(Qt_LIBS
-    Qt5::Gui
-    Qt5::Widgets
-    )
 
 add_library(${QTERMWIDGET_LIBRARY_NAME} STATIC
             ${SRCS}
-            ${UI_FILES}
             ${HDRS}
-
-            ${QRC_FILES}
+            ${UI_FILES}
             )
-target_link_libraries(${QTERMWIDGET_LIBRARY_NAME} ${Qt_LIBS})
-set_target_properties(${QTERMWIDGET_LIBRARY_NAME} PROPERTIES
-                      SOVERSION ${QTERMWIDGET_VERSION_MAJOR}
-                      VERSION ${QTERMWIDGET_VERSION})
-if (UTF8PROC_FOUND)
+target_link_libraries(${QTERMWIDGET_LIBRARY_NAME} Qt6::Widgets)
+target_compile_definitions(${QTERMWIDGET_LIBRARY_NAME} PRIVATE
+                           "KB_LAYOUT_DIR=\"${KB_LAYOUT_DIR}\""
+                           "COLORSCHEMES_DIR=\"${COLORSCHEMES_DIR}\""
+                           "TRANSLATIONS_DIR=\"${TRANSLATIONS_DIR}\""
+                           )
+target_include_directories(${QTERMWIDGET_LIBRARY_NAME} PUBLIC
+                           "${CMAKE_CURRENT_SOURCE_DIR}/lib"
+                           "${CMAKE_CURRENT_BINARY_DIR}/lib"
+                           )
+
+generate_export_header(${QTERMWIDGET_LIBRARY_NAME}
+                       EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/lib/qtermwidget_export.h"
+                       BASE_NAME QTERMWIDGET
+                       )
+configure_file(lib/qtermwidget_version.h.in
+               "${CMAKE_CURRENT_BINARY_DIR}/lib/qtermwidget_version.h"
+               @ONLY
+               )
+
+if(UTF8PROC_FOUND)
+    target_compile_definitions(${QTERMWIDGET_LIBRARY_NAME} PRIVATE "HAVE_UTF8PROC")
+    target_include_directories(${QTERMWIDGET_LIBRARY_NAME} PUBLIC "${UTF8PROC_INCLUDE_DIRS}")
     target_link_libraries(${QTERMWIDGET_LIBRARY_NAME} ${UTF8PROC_LIBRARIES})
 endif()
 
-# test application
-if(BUILD_TEST)
-    set(TEST_SRC src/main.cpp)
-    add_executable(test-term
-                   ${TEST_SRC}
-
-                   ${QRC_FILES}
-                   )
-    add_dependencies(test-term ${QTERMWIDGET_LIBRARY_NAME})
-    link_directories(${CMAKE_BINARY_DIR})
-    target_link_libraries(test-term ${Qt_LIBS} ${QTERMWIDGET_LIBRARY_NAME})
-endif (BUILD_TEST)
-# end of test application
+# Terminal data files used by the widget at runtime.
+install(DIRECTORY lib/kb-layouts/
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/kb-layouts"
+        FILES_MATCHING PATTERN "*.keytab"
+        )
+install(DIRECTORY lib/color-schemes/
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/color-schemes"
+        FILES_MATCHING PATTERN "*.*schem*"
+        )

@@ -484,7 +484,7 @@ set(LINK_LIBS
 
     global_shortcut
     qrencode
-    qtermwidget5
+    qtermwidget6
     zlib_wrapper
     Xi
     )
@@ -509,10 +509,6 @@ add_executable(deepin-installer
                ${SERVICE_FILES}
                ${SYSINFO_FILES}
                ${UI_FILES}
-
-               # Also include color-schems used in qtermwidget.
-               third_party/qtermwidget/lib/color-schemes/color-schemes.qrc
-               third_party/qtermwidget/lib/kb-layouts/kb-layouts.qrc
                )
 
 target_link_libraries(deepin-installer ${LINK_LIBS})

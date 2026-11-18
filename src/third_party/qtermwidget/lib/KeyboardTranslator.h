@@ -111,8 +111,12 @@ public:
         ScrollLineDownCommand = 16,
         /** Toggles scroll lock mode */
         ScrollLockCommand = 32,
+        /** Scroll the terminal display up to the start of history */
+        ScrollUpToTopCommand = 64,
+        /** Scroll the terminal display down to the end of history */
+        ScrollDownToBottomCommand = 128,
         /** Echos the operating system specific erase character. */
-        EraseCommand = 64
+        EraseCommand = 256
     };
     Q_DECLARE_FLAGS(Commands,Command)
 
@@ -310,6 +314,9 @@ public:
     /** Returns a list of all entries in the translator. */
     QList<Entry> entries() const;
 
+    /** The modifier code for the actual Ctrl key on this OS. */
+    static const Qt::KeyboardModifier CTRL_MOD;
+
 private:
 
     QMultiHash<int,Entry> _entries; // entries in this keyboard translation,
@@ -362,7 +369,7 @@ public:
     QString description() const;
 
     /** Returns true if there is another entry in the source stream */
-    bool hasNextEntry();
+    bool hasNextEntry() const;
     /** Returns the next entry found in the source stream */
     KeyboardTranslator::Entry nextEntry();
 
@@ -413,6 +420,9 @@ private:
     QString _description;
     KeyboardTranslator::Entry _nextEntry;
     bool _hasNext;
+
+    KeyboardTranslatorReader(const KeyboardTranslatorReader&) = delete;
+    KeyboardTranslatorReader& operator=(const KeyboardTranslatorReader&) = delete;
 };
 
 /** Writes a keyboard translation to disk. */
@@ -437,6 +447,9 @@ public:
 private:
     QIODevice* _destination;
     QTextStream* _writer;
+
+    KeyboardTranslatorWriter(const KeyboardTranslatorWriter&) = delete;
+    KeyboardTranslatorWriter& operator=(const KeyboardTranslatorWriter&) = delete;
 };
 
 /**
@@ -554,8 +567,8 @@ inline QByteArray KeyboardTranslator::Entry::text(bool expandWildCards,Qt::Keybo
     {
         int modifierValue = 1;
         modifierValue += oneOrZero(modifiers & Qt::ShiftModifier);
-        modifierValue += oneOrZero(modifiers & Qt::AltModifier)     << 1;
-        modifierValue += oneOrZero(modifiers & Qt::ControlModifier) << 2;
+        modifierValue += oneOrZero(modifiers & Qt::AltModifier) << 1;
+        modifierValue += oneOrZero(modifiers & KeyboardTranslator::CTRL_MOD) << 2;
 
         for (int i=0;i<_text.length();i++)
         {

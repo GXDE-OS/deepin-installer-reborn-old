@@ -78,16 +78,6 @@ public:
    */
   ColorEntry() : transparent(false), fontWeight(UseCurrentFormat) {}
 
-  /**
-   * Sets the color, transparency and boldness of this color to those of @p rhs.
-   */
-  void operator=(const ColorEntry& rhs)
-  {
-       color = rhs.color;
-       transparent = rhs.transparent;
-       fontWeight = rhs.fontWeight;
-  }
-
   /** The color value of this entry for display. */
   QColor color;
 
@@ -150,7 +140,7 @@ class CharacterColor
     friend class Character;
 
 public:
-  /** Constructs a new CharacterColor whoose color and color space are undefined. */
+  /** Constructs a new CharacterColor whose color and color space are undefined. */
   CharacterColor()
       : _colorSpace(COLOR_SPACE_UNDEFINED),
         _u(0),
@@ -199,19 +189,19 @@ public:
   /**
    * Returns true if this character color entry is valid.
    */
-  bool isValid()
+  bool isValid() const
   {
         return _colorSpace != COLOR_SPACE_UNDEFINED;
   }
 
   /**
-   * Toggles the value of this color between a normal system color and the corresponding intensive
-   * system color.
+   * Set the value of this color from a normal system color to the corresponding intensive
+   * system color if it's not already an intensive system color.
    *
    * This is only applicable if the color is using the COLOR_SPACE_DEFAULT or COLOR_SPACE_SYSTEM
    * color spaces.
    */
-  void toggleIntensive();
+  void setIntensive();
 
   /**
    * Returns the color within the specified color @p palette
@@ -278,7 +268,7 @@ inline QColor CharacterColor::color(const ColorEntry* base) const
     case COLOR_SPACE_DEFAULT: return base[_u+0+(_v?BASE_COLORS:0)].color;
     case COLOR_SPACE_SYSTEM: return base[_u+2+(_v?BASE_COLORS:0)].color;
     case COLOR_SPACE_256: return color256(_u,base);
-    case COLOR_SPACE_RGB: return QColor(_u,_v,_w);
+    case COLOR_SPACE_RGB: return {_u,_v,_w};
     case COLOR_SPACE_UNDEFINED: return QColor();
   }
 
@@ -287,11 +277,11 @@ inline QColor CharacterColor::color(const ColorEntry* base) const
   return QColor();
 }
 
-inline void CharacterColor::toggleIntensive()
+inline void CharacterColor::setIntensive()
 {
   if (_colorSpace == COLOR_SPACE_SYSTEM || _colorSpace == COLOR_SPACE_DEFAULT)
   {
-    _v = !_v;
+    _v = 1;
   }
 }
 

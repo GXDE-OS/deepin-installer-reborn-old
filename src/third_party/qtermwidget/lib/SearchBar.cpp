@@ -18,7 +18,6 @@
 */
 #include <QMenu>
 #include <QAction>
-#include <QRegExp>
 #include <QDebug>
 
 #include "SearchBar.h"
@@ -26,7 +25,8 @@
 SearchBar::SearchBar(QWidget *parent) : QWidget(parent)
 {
     widget.setupUi(this);
-    connect(widget.closeButton, SIGNAL(clicked()), this, SLOT(hide()));
+    setAutoFillBackground(true); // make it always opaque, especially inside translucent windows
+    connect(widget.closeButton, &QAbstractButton::clicked, this, &SearchBar::hide);
     connect(widget.searchTextEdit, SIGNAL(textChanged(QString)), this, SIGNAL(searchCriteriaChanged()));
     connect(widget.findPreviousButton, SIGNAL(clicked()), this, SIGNAL(findPrevious()));
     connect(widget.findNextButton, SIGNAL(clicked()), this, SIGNAL(findNext()));
@@ -48,8 +48,9 @@ SearchBar::SearchBar(QWidget *parent) : QWidget(parent)
 
     m_highlightMatchesMenuEntry = optionsMenu->addAction(tr("Highlight all matches"));
     m_highlightMatchesMenuEntry->setCheckable(true);
-    m_highlightMatchesMenuEntry->setChecked(true);
+    m_highlightMatchesMenuEntry->setChecked(false);
     connect(m_highlightMatchesMenuEntry, SIGNAL(toggled(bool)), this, SIGNAL(highlightMatchesChanged(bool)));
+    connect(m_highlightMatchesMenuEntry, SIGNAL(toggled(bool)), this, SIGNAL(searchCriteriaChanged()));
 }
 
 SearchBar::~SearchBar() {
@@ -80,6 +81,17 @@ void SearchBar::show()
 {
     QWidget::show();
     widget.searchTextEdit->setFocus();
+    widget.searchTextEdit->selectAll();
+}
+
+void SearchBar::hide()
+{
+    QWidget::hide();
+    if (QWidget *p = parentWidget())
+    {
+        p->setFocus(Qt::OtherFocusReason); // give the focus to the parent widget on hiding
+    }
+    Q_EMIT madeHidden();
 }
 
 void SearchBar::noMatchFound()
@@ -96,11 +108,11 @@ void SearchBar::keyReleaseEvent(QKeyEvent* keyEvent)
     {
         if (keyEvent->modifiers() == Qt::ShiftModifier)
         {
-            findPrevious();
+            Q_EMIT findPrevious();
         }
         else
         {
-            findNext();
+            Q_EMIT findNext();
         }
     }
     else if (keyEvent->key() == Qt::Key_Escape)
@@ -111,8 +123,6 @@ void SearchBar::keyReleaseEvent(QKeyEvent* keyEvent)
 
 void SearchBar::clearBackgroundColor()
 {
-    QPalette p;
-    p.setColor(QPalette::Base, Qt::white);
-    widget.searchTextEdit->setPalette(p);
+    widget.searchTextEdit->setPalette(QWidget::window()->palette());
 
 }

@@ -26,17 +26,16 @@
 #include "Session.h"
 
 // Standard
-#include <stdlib.h>
+#include <cstdlib>
 
 // Qt
 #include <QApplication>
-#include <QByteRef>
 #include <QDir>
 #include <QFile>
-#include <QRegExp>
 #include <QStringList>
-#include <QFile>
+#include <QSysInfo>
 #include <QtDebug>
+#include <QRegularExpression>
 
 #include "Pty.h"
 //#include "kptyprocess.h"
@@ -45,13 +44,14 @@
 #include "Vt102Emulation.h"
 
 using namespace Konsole;
+using namespace Qt::Literals::StringLiterals;
 
 int Session::lastSessionId = 0;
 
 Session::Session(QObject* parent) :
     QObject(parent),
-        _shellProcess(0)
-        , _emulation(0)
+        _shellProcess(nullptr)
+        , _emulation(nullptr)
         , _monitorActivity(false)
         , _monitorSilence(false)
         , _notifiedActivity(false)
@@ -99,9 +99,11 @@ Session::Session(QObject* parent) :
             this, SLOT(onEmulationSizeChange(QSize)));
     connect(_emulation, SIGNAL(imageSizeChanged(int, int)),
             this, SLOT(onViewSizeChange(int, int)));
+    connect(_emulation, &Vt102Emulation::cursorChanged,
+            this, &Session::cursorChanged);
 
     //connect teletype to emulation backend
-    _shellProcess->setUtf8Mode(_emulation->utf8());
+    _shellProcess->setUtf8Mode(true);
 
     connect( _shellProcess,SIGNAL(receivedData(const char *,int)),this,
              SLOT(onReceiveBlock(const char *,int)) );
@@ -110,7 +112,7 @@ Session::Session(QObject* parent) :
     connect( _emulation,SIGNAL(lockPtyRequest(bool)),_shellProcess,SLOT(lockPty(bool)) );
     connect( _emulation,SIGNAL(useUtf8Request(bool)),_shellProcess,SLOT(setUtf8Mode(bool)) );
 
-    connect( _shellProcess,SIGNAL(finished(int,QProcess::ExitStatus)), this, SLOT(done(int)) );
+    connect( _shellProcess,SIGNAL(finished(int,QProcess::ExitStatus)), this, SLOT(done(int,QProcess::ExitStatus)) );
     // not in kprocess anymore connect( _shellProcess,SIGNAL(done(int)), this, SLOT(done(int)) );
 
     //setup timer for monitoring session activity
@@ -138,12 +140,7 @@ bool Session::hasDarkBackground() const
 }
 bool Session::isRunning() const
 {
-    return _shellProcess->state() == QProcess::Running;
-}
-
-void Session::setCodec(QTextCodec * codec)
-{
-    emulation()->setCodec(codec);
+    return (_shellProcess != nullptr && _shellProcess->state() == QProcess::Running);
 }
 
 void Session::setProgram(const QString & program)
@@ -154,6 +151,32 @@ void Session::setInitialWorkingDirectory(const QString & dir)
 {
     _initialWorkingDir = ShellCommand::expand(dir);
 }
+
+QString Session::currentWorkingDirectory()
+{
+    if (_reportedWorkingUrl.isValid() && _reportedWorkingUrl.isLocalFile()
+        && (_reportedWorkingUrl.host().length() == 0 || _reportedWorkingUrl.host().compare(QSysInfo::machineHostName(), Qt::CaseInsensitive) == 0)) {
+        return _reportedWorkingUrl.path();
+    }
+
+#ifdef Q_OS_LINUX
+    // Christian Surlykke: On linux we could look at /proc/<pid>/cwd which should be a link to current
+    // working directory (<pid>: process id of the shell). I don't know about BSD.
+    // Maybe we could just offer it when running linux, for a start.
+    QDir d(QString::fromLatin1("/proc/%1/cwd").arg(processId()));
+    if (!d.exists())
+    {
+        qDebug() << "Cannot find" << d.dirName();
+        goto fallback;
+    }
+    return d.canonicalPath();
+#endif
+
+fallback:
+    // fallback, initial WD
+    return _initialWorkingDir;
+}
+
 void Session::setArguments(const QStringList & arguments)
 {
     _arguments = ShellCommand::expand(arguments);
@@ -170,10 +193,10 @@ void Session::addView(TerminalDisplay * widget)
 
     _views.append(widget);
 
-    if ( _emulation != 0 ) {
+    if ( _emulation != nullptr ) {
         // connect emulation - view signals and slots
-        connect( widget , SIGNAL(keyPressedSignal(QKeyEvent *)) , _emulation ,
-                 SLOT(sendKeyEvent(QKeyEvent *)) );
+        connect( widget , &TerminalDisplay::keyPressedSignal, _emulation ,
+                 &Emulation::sendKeyEvent);
         connect( widget , SIGNAL(mouseSignal(int,int,int,int)) , _emulation ,
                  SLOT(sendMouseEvent(int,int,int,int)) );
         connect( widget , SIGNAL(sendStringToEmu(const char *)) , _emulation ,
@@ -218,19 +241,19 @@ void Session::removeView(TerminalDisplay * widget)
 {
     _views.removeAll(widget);
 
-    disconnect(widget,0,this,0);
+    disconnect(widget,nullptr,this,nullptr);
 
-    if ( _emulation != 0 ) {
+    if ( _emulation != nullptr ) {
         // disconnect
         //  - key presses signals from widget
         //  - mouse activity signals from widget
         //  - string sending signals from widget
         //
         //  ... and any other signals connected in addView()
-        disconnect( widget, 0, _emulation, 0);
+        disconnect( widget, nullptr, _emulation, nullptr);
 
         // disconnect state change signals emitted by emulation
-        disconnect( _emulation , 0 , widget , 0);
+        disconnect( _emulation , nullptr , widget , nullptr);
     }
 
     // close the session automatically when the last view is removed
@@ -244,34 +267,37 @@ void Session::run()
     // Upon a KPty error, there is no description on what that error was...
     // Check to see if the given program is executable.
 
-    /* ok iam not exactly sure where _program comes from - however it was set to /bin/bash on my system
-     * Thats bad for BSD as its /usr/local/bin/bash there - its also bad for arch as its /usr/bin/bash there too!
+    /* ok I'm not exactly sure where _program comes from - however it was set to /bin/bash on my system
+     * That's bad for BSD as its /usr/local/bin/bash there - its also bad for arch as its /usr/bin/bash there too!
      * So i added a check to see if /bin/bash exists - if no then we use $SHELL - if that does not exist either, we fall back to /bin/sh
      * As far as i know /bin/sh exists on every unix system.. You could also just put some ifdef __FREEBSD__ here but i think these 2 filechecks are worth
-     * their computing time on any system - especially with the problem on arch linux beeing there too.
+     * their computing time on any system - especially with the problem on arch linux being there too.
      */
-    QString exec = QFile::encodeName(_program);
+    QString exec = QString::fromLocal8Bit(QFile::encodeName(_program));
     // if 'exec' is not specified, fall back to default shell.  if that
     // is not set then fall back to /bin/sh
 
     // here we expect full path. If there is no fullpath let's expect it's
     // a custom shell (eg. python, etc.) available in the PATH.
-    if (exec.startsWith("/"))
+    if (exec.startsWith(QLatin1Char('/')) || exec.isEmpty())
     {
+        const QString defaultShell{QLatin1String("/bin/sh")};
+
         QFile excheck(exec);
         if ( exec.isEmpty() || !excheck.exists() ) {
-            exec = getenv("SHELL");
+            exec = QString::fromLocal8Bit(qgetenv("SHELL"));
         }
         excheck.setFileName(exec);
 
         if ( exec.isEmpty() || !excheck.exists() ) {
-            exec = "/bin/sh";
+            qWarning() << "Neither default shell nor $SHELL is set to a correct path. Fallback to" << defaultShell;
+            exec = defaultShell;
         }
     }
 
     // _arguments sometimes contain ("") so isEmpty()
     // or count() does not work as expected...
-    QString argsTmp(_arguments.join(" ").trimmed());
+    QString argsTmp(_arguments.join(QLatin1Char(' ')).trimmed());
     QStringList arguments;
     arguments << exec;
     if (argsTmp.length())
@@ -279,9 +305,9 @@ void Session::run()
 
     QString cwd = QDir::currentPath();
     if (!_initialWorkingDir.isEmpty()) {
-        _shellProcess->setWorkingDirectory(_initialWorkingDir);
+        _shellProcess->setInitialWorkingDirectory(_initialWorkingDir);
     } else {
-        _shellProcess->setWorkingDirectory(cwd);
+        _shellProcess->setInitialWorkingDirectory(cwd);
     }
 
     _shellProcess->setFlowControlEnabled(_flowControl);
@@ -291,7 +317,7 @@ void Session::run()
     // tell the terminal exactly which colors are being used, but instead approximates
     // the color scheme as "black on white" or "white on black" depending on whether
     // the background color is deemed dark or not
-    QString backgroundColorHint = _hasDarkBackground ? "COLORFGBG=15;0" : "COLORFGBG=0;15";
+    QString backgroundColorHint = _hasDarkBackground ? QLatin1String("COLORFGBG=15;0") : QLatin1String("COLORFGBG=0;15");
 
     /* if we do all the checking if this shell exists then we use it ;)
      * Dont know about the arguments though.. maybe youll need some more checking im not sure
@@ -318,7 +344,7 @@ void Session::runEmptyPTY()
     _shellProcess->setErase(_emulation->eraseChar());
     _shellProcess->setWriteable(false);
 
-    // disconnet send data from emulator to internal terminal process
+    // disconnect send data from emulator to internal terminal process
     disconnect( _emulation,SIGNAL(sendData(const char *,int)),
                 _shellProcess, SLOT(sendData(const char *,int)) );
 
@@ -348,8 +374,13 @@ void Session::setUserTitle( int what, const QString & caption )
         }
     }
 
+    if (what == 7) {
+        _reportedWorkingUrl = QUrl::fromUserInput(caption);
+        emit currentDirectoryChanged(currentWorkingDirectory());
+    }
+
     if (what == 11) {
-        QString colorString = caption.section(';',0,0);
+        QString colorString = caption.section(QLatin1Char(';'),0,0);
         //qDebug() << __FILE__ << __LINE__ << ": setting background colour to " << colorString;
         QColor backColor = QColor(colorString);
         if (backColor.isValid()) { // change color via \033]11;Color\007
@@ -376,7 +407,8 @@ void Session::setUserTitle( int what, const QString & caption )
 
     if (what == 31) {
         QString cwd=caption;
-        cwd=cwd.replace( QRegExp("^~"), QDir::homePath() );
+        static const QRegularExpression homeRegExp{"^~"_L1};
+        cwd = cwd.replace(homeRegExp, QDir::homePath());
         emit openUrlRequest(cwd);
     }
 
@@ -446,10 +478,7 @@ void Session::monitorTimerDone()
 void Session::activityStateSet(int state)
 {
     if (state==NOTIFYBELL) {
-        QString s;
-        s.sprintf("Bell in session '%s'",_nameTitle.toUtf8().data());
-
-        emit bellRequest( s );
+        emit bellRequest(tr("Bell in session '%1'").arg(_nameTitle));
     } else if (state==NOTIFYACTIVITY) {
         if (_monitorSilence) {
             _monitorTimer->start(_silenceSeconds*1000);
@@ -537,23 +566,52 @@ void Session::refresh()
 
 bool Session::sendSignal(int signal)
 {
-    int result = ::kill(_shellProcess->pid(),signal);
+    if (processId() <= 0)
+    {
+        return false;
+    }
+
+    int result = ::kill(static_cast<pid_t>(_shellProcess->processId()), signal);
 
      if ( result == 0 )
      {
-         _shellProcess->waitForFinished();
-         return true;
+         return _shellProcess->waitForFinished(1000);
      }
      else
+     {
          return false;
+     }
 }
 
 void Session::close()
 {
     _autoClose = true;
     _wantedClose = true;
-    if (!_shellProcess->isRunning() || !sendSignal(SIGHUP)) {
-        // Forced close.
+
+    if (isRunning())
+    {
+        // Try SIGHUP, and if unsuccessful, do a hard kill.
+        // This is the sequence used by most other terminal emulators like xterm, gnome-terminal, ...
+        if (sendSignal(SIGHUP))
+        {
+            return;
+        }
+
+        qWarning() << "Process " << processId() << " did not die with SIGHUP";
+        _shellProcess->closePty();
+        if (!_shellProcess->waitForFinished(1000))
+        {
+            if (!sendSignal(SIGKILL))
+            {
+                qWarning() << "Process " << processId() << " did not die with SIGKILL";
+                // Forced close.
+                QTimer::singleShot(1, this, SIGNAL(finished()));
+            }
+        }
+    }
+    else
+    {
+        // terminal process has finished, just close the session
         QTimer::singleShot(1, this, SIGNAL(finished()));
     }
 }
@@ -563,8 +621,14 @@ void Session::sendText(const QString & text) const
     _emulation->sendText(text);
 }
 
+void Session::sendKeyEvent(QKeyEvent* e) const
+{
+    _emulation->sendKeyEvent(e, false);
+}
+
 Session::~Session()
 {
+    close();
     delete _emulation;
     delete _shellProcess;
 //  delete _zmodemProc;
@@ -580,29 +644,30 @@ QString Session::profileKey() const
     return _profileKey;
 }
 
-void Session::done(int exitStatus)
+void Session::done(int exitCode, QProcess::ExitStatus exitStatus)
 {
     if (!_autoClose) {
-        _userTitle = ("This session is done. Finished");
+        _userTitle = QString::fromLatin1("This session is done. Finished");
         emit titleChanged();
         return;
     }
 
+    // message is not being used. But in the original kpty.cpp file
+    // (https://cgit.kde.org/kpty.git/) it's part of a notification.
+    // So, we make it translatable, hoping that in the future it will
+    // be used in some kind of notification.
     QString message;
-    if (!_wantedClose || exitStatus != 0) {
+    if (!_wantedClose || exitCode != 0) {
 
         if (_shellProcess->exitStatus() == QProcess::NormalExit) {
-            message.sprintf("Session '%s' exited with status %d.",
-                          _nameTitle.toUtf8().data(), exitStatus);
+            message = tr("Session '%1' exited with code %2.").arg(_nameTitle).arg(exitCode);
         } else {
-            message.sprintf("Session '%s' crashed.",
-                          _nameTitle.toUtf8().data());
+            message = tr("Session '%1' crashed.").arg(_nameTitle);
         }
     }
 
-    if ( !_wantedClose && _shellProcess->exitStatus() != QProcess::NormalExit )
-        message.sprintf("Session '%s' exited unexpectedly.",
-                        _nameTitle.toUtf8().data());
+    if ( !_wantedClose && exitStatus != QProcess::NormalExit )
+        message = tr("Session '%1' exited unexpectedly.").arg(_nameTitle);
     else
         emit finished();
 
@@ -920,7 +985,7 @@ int Session::foregroundProcessId() const
 }
 int Session::processId() const
 {
-    return _shellProcess->pid();
+    return static_cast<int>(_shellProcess->processId());
 }
 int Session::getPtySlaveFd() const
 {
@@ -1008,8 +1073,7 @@ void SessionGroup::setMasterStatus(Session * session, bool master)
     bool wasMaster = _sessions[session];
     _sessions[session] = master;
 
-    if ((!wasMaster && !master)
-            || (wasMaster && master)) {
+    if (wasMaster == master) {
         return;
     }
 
@@ -1027,7 +1091,7 @@ void SessionGroup::setMasterStatus(Session * session, bool master)
     }
 }
 
-void SessionGroup::connectPair(Session * master , Session * other)
+void SessionGroup::connectPair(Session * master , Session * other) const
 {
 //    qDebug() << k_funcinfo;
 
@@ -1038,7 +1102,7 @@ void SessionGroup::connectPair(Session * master , Session * other)
                  SLOT(sendString(const char *,int)) );
     }
 }
-void SessionGroup::disconnectPair(Session * master , Session * other)
+void SessionGroup::disconnectPair(Session * master , Session * other) const
 {
 //    qDebug() << k_funcinfo;
 

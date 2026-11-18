@@ -33,11 +33,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <errno.h>
+#include <cerrno>
 #include <termios.h>
-#include <signal.h>
+#include <csignal>
 
 // Qt
+#include <QFileInfo>
 #include <QStringList>
 #include <QtDebug>
 
@@ -56,7 +57,7 @@ void Pty::setWindowSize(int lines, int cols)
 }
 QSize Pty::windowSize() const
 {
-    return QSize(_windowColumns,_windowLines);
+    return {_windowColumns,_windowLines};
 }
 
 void Pty::setFlowControlEnabled(bool enable)
@@ -133,23 +134,55 @@ char Pty::erase() const
     return _eraseChar;
 }
 
+void Pty::setInitialWorkingDirectory(const QString &dir)
+{
+    QString pwd = dir;
+
+    // remove trailing slash in the path when appropriate
+    // example: /usr/share/icons/ ==> /usr/share/icons
+    if (pwd.length() > 1 && pwd.endsWith(QLatin1Char('/'))) {
+        pwd.chop(1);
+    }
+
+    setWorkingDirectory(pwd);
+
+    // setting PWD to "." will cause problem for bash & zsh
+    if (pwd != QLatin1String(".")) {
+        // Preserve the inherited PWD if it resolves to the same real directory.
+        // This keeps symlink-based paths intact (e.g., when a file manager opens
+        // a terminal in a symlinked directory with PWD set to the symlink path).
+        const QString inheritedPwd = QString::fromLocal8Bit(qgetenv("PWD"));
+        if (inheritedPwd.isEmpty()
+            || QFileInfo(inheritedPwd).canonicalFilePath() != QFileInfo(pwd).canonicalFilePath()) {
+            setEnv(QStringLiteral("PWD"), pwd);
+        }
+    }
+}
+
 void Pty::addEnvironmentVariables(const QStringList& environment)
 {
-    QListIterator<QString> iter(environment);
-    while (iter.hasNext())
+    bool termEnvVarAdded = false;
+    for (const QString &pair : environment)
     {
-        QString pair = iter.next();
-
         // split on the first '=' character
-        int pos = pair.indexOf('=');
+        int pos = pair.indexOf(QLatin1Char('='));
 
-        if ( pos >= 0 )
+        if (pos >= 0)
         {
             QString variable = pair.left(pos);
-            QString value = pair.mid(pos+1);
+            QString value = pair.mid(pos + 1);
 
-            setEnv(variable,value);
+            setEnv(variable, value);
+
+            if (variable == QLatin1String("TERM")) {
+                termEnvVarAdded = true;
+            }
         }
+    }
+
+    // fallback to ensure that $TERM is always set
+    if (!termEnvVarAdded) {
+        setEnv(QStringLiteral("TERM"), QStringLiteral("xterm-256color"));
     }
 }
 
@@ -168,11 +201,12 @@ int Pty::start(const QString& program,
   // name of the program to execute, so create a list consisting of all
   // but the first argument to pass to setProgram()
   Q_ASSERT(programArguments.count() >= 1);
-  setProgram(program.toLatin1(),programArguments.mid(1));
+  setProgram(program, programArguments.mid(1));
 
   addEnvironmentVariables(environment);
 
-  setEnv("WINDOWID", QString::number(winid));
+  setEnv(QLatin1String("WINDOWID"), QString::number(winid));
+  setEnv(QLatin1String("COLORTERM"), QLatin1String("truecolor"));
 
   // unless the LANGUAGE environment variable has been set explicitly
   // set it to a null string
@@ -185,7 +219,7 @@ int Pty::start(const QString& program,
   // does not have a translation for
   //
   // BR:149300
-  setEnv("LANGUAGE",QString(),false /* do not overwrite existing value if any */);
+  setEnv(QLatin1String("LANGUAGE"),QString(),false /* do not overwrite existing value if any */);
 
   setUseUtmp(addToUtmp);
 
@@ -262,6 +296,26 @@ Pty::Pty(QObject* parent)
 }
 void Pty::init()
 {
+    // Must call parent class child process modifier, as it sets file descriptors ...etc
+    auto parentChildProcModifier = KPtyProcess::childProcessModifier();
+    setChildProcessModifier([parentChildProcModifier = std::move(parentChildProcModifier)]() {
+        if (parentChildProcModifier) {
+            parentChildProcModifier();
+        }
+
+        // reset all signal handlers
+        // this ensures that terminal applications respond to
+        // signals generated via key sequences such as Ctrl+C
+        // (which sends SIGINT)
+        struct sigaction action;
+        sigemptyset(&action.sa_mask);
+        action.sa_handler = SIG_DFL;
+        action.sa_flags = 0;
+        for (int signal = 1; signal < NSIG; signal++) {
+            sigaction(signal, &action, nullptr);
+        }
+    });
+
   _windowColumns = 0;
   _windowLines = 0;
   _eraseChar = 0;
@@ -290,13 +344,17 @@ void Pty::sendData(const char* data, int length)
 
 void Pty::dataReceived()
 {
-     QByteArray data = pty()->readAll();
-    emit receivedData(data.constData(),data.count());
+    QByteArray data = pty()->readAll();
+    if (data.isEmpty())
+    {
+        return;
+    }
+    emit receivedData(data.constData(),data.size());
 }
 
 void Pty::lockPty(bool lock)
 {
-    Q_UNUSED(lock);
+    Q_UNUSED(lock)
 
 // TODO: Support for locking the Pty
   //if (lock)
@@ -307,32 +365,22 @@ void Pty::lockPty(bool lock)
 
 int Pty::foregroundProcessGroup() const
 {
-    int pid = tcgetpgrp(pty()->masterFd());
-
-    if ( pid != -1 )
+    const int master_fd = pty()->masterFd();
+    if (master_fd >= 0)
     {
-        return pid;
+        int pid = tcgetpgrp(master_fd);
+
+        if (pid != -1)
+        {
+            return pid;
+        }
     }
 
     return 0;
 }
 
-void Pty::setupChildProcess()
+void Pty::closePty()
 {
-    KPtyProcess::setupChildProcess();
-
-    // reset all signal handlers
-    // this ensures that terminal applications respond to
-    // signals generated via key sequences such as Ctrl+C
-    // (which sends SIGINT)
-    struct sigaction action;
-    sigset_t sigset;
-    sigemptyset(&action.sa_mask);
-    action.sa_handler = SIG_DFL;
-    action.sa_flags = 0;
-    for (int signal=1;signal < NSIG; signal++) {
-        sigaction(signal,&action,0L);
-        sigaddset(&sigset, signal);
-    }
-    sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+    pty()->close();
 }
+

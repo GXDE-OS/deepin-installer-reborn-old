@@ -24,23 +24,21 @@
 #define EMULATION_H
 
 // System
-#include <stdio.h>
+#include <cstdio>
 
 // Qt
 #include <QKeyEvent>
 //#include <QPointer>
-#include <QTextCodec>
 #include <QTextStream>
 #include <QTimer>
+#include <QStringDecoder>
 
-// Konsole
-//#include "konsole_export.h"
-#define KONSOLEPRIVATE_EXPORT
+#include "qtermwidget_export.h"
+#include "KeyboardTranslator.h"
 
 namespace Konsole
 {
 
-class KeyboardTranslator;
 class HistoryType;
 class Screen;
 class ScreenWindow;
@@ -120,15 +118,35 @@ enum
  * how long the emulation has been active/idle for and also respond to
  * a 'bell' event in different ways.
  */
-class KONSOLEPRIVATE_EXPORT Emulation : public QObject
+class QTERMWIDGET_EXPORT Emulation : public QObject
 {
 Q_OBJECT
 
 public:
 
+  /**
+   * This enum describes the available shapes for the keyboard cursor.
+   * See setKeyboardCursorShape()
+   */
+  enum class KeyboardCursorShape {
+      /** A rectangular block which covers the entire area of the cursor character. */
+      BlockCursor = 0,
+      /**
+       * A single flat line which occupies the space at the bottom of the cursor
+       * character's area.
+       */
+      UnderlineCursor = 1,
+      /**
+       * An cursor shaped like the capital letter 'I', similar to the IBeam
+       * cursor used in Qt/KDE text editors.
+       */
+      IBeamCursor = 2
+  };
+
+
    /** Constructs a new terminal emulation */
    Emulation();
-  ~Emulation();
+  ~Emulation() override;
 
   /**
    * Creates a new window onto the output from this emulation.  The contents
@@ -171,20 +189,6 @@ public:
    * @param endLine Index of last line to copy
    */
   virtual void writeToStream(TerminalCharacterDecoder* decoder,int startLine,int endLine);
-
-  /** Returns the codec used to decode incoming characters.  See setCodec() */
-  const QTextCodec* codec() const { return _codec; }
-  /** Sets the codec used to decode incoming characters.  */
-  void setCodec(const QTextCodec*);
-
-  /**
-   * Convenience method.
-   * Returns true if the current codec used to decode incoming
-   * characters is UTF-8
-   */
-  bool utf8() const
-  { Q_ASSERT(_codec); return _codec->mibEnum() == 106; }
-
 
   /** TODO Document me */
   virtual char eraseChar() const;
@@ -235,7 +239,7 @@ public slots:
    * Interprets a key press event and emits the sendData() signal with
    * the resulting character stream.
    */
-  virtual void sendKeyEvent(QKeyEvent*);
+  virtual void sendKeyEvent(QKeyEvent*, bool fromPaste);
 
   /**
    * Converts information about a mouse event into an xterm-compatible escape
@@ -415,6 +419,18 @@ signals:
    */
   void flowControlKeyPressed(bool suspendKeyPressed);
 
+  /**
+   * Emitted when the cursor shape or its blinking state is changed via
+   * DECSCUSR sequences.
+   *
+   * @param cursorShape One of 3 possible values in KeyboardCursorShape enum
+   * @param blinkingCursorEnabled Whether to enable blinking or not
+   */
+  void cursorChanged(KeyboardCursorShape cursorShape, bool blinkingCursorEnabled);
+
+  void handleCommandFromKeyboard(KeyboardTranslator::Command command);
+  void outputFromKeypressEvent(void);
+
 protected:
   virtual void setMode(int mode) = 0;
   virtual void resetMode(int mode) = 0;
@@ -423,7 +439,7 @@ protected:
    * Processes an incoming character.  See receiveData()
    * @p ch A unicode character code.
    */
-  virtual void receiveChar(int ch);
+  virtual void receiveChar(wchar_t ch);
 
   /**
    * Sets the active screen.  The terminal has two screens, primary and alternate.
@@ -453,10 +469,6 @@ protected:
                             //                      scrollbars are not enabled in this mode )
 
 
-  //decodes an incoming C-style character stream into a unicode QString using
-  //the current text codec.  (this allows for rendering of non-ASCII characters in text files etc.)
-  const QTextCodec* _codec;
-  QTextDecoder* _decoder;
   const KeyboardTranslator* _keyTranslator; // the keyboard layout
 
 protected slots:
@@ -480,9 +492,9 @@ private slots:
 private:
   bool _usesMouse;
   bool _bracketedPasteMode;
-  QTimer _bulkTimer1;
-  QTimer _bulkTimer2;
-
+  QTimer _bulkTimer1{this};
+  QTimer _bulkTimer2{this};
+  QStringDecoder _toUtf16;
 };
 
 }

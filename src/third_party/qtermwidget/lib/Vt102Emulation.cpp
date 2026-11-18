@@ -22,33 +22,16 @@
 
 // Own
 #include "Vt102Emulation.h"
-
-// XKB
-//#include <config-konsole.h>
-
-// this allows konsole to be compiled without XKB and XTEST extensions
-// even though it might be available on a particular system.
-#if defined(AVOID_XKB)
-    #undef HAVE_XKB
-#endif
-
-#if defined(HAVE_XKB)
-    void scrolllock_set_off();
-    void scrolllock_set_on();
-#endif
+#include "tools.h"
 
 // Standard
-#include <stdio.h>
+#include <cstdio>
 #include <unistd.h>
 
 // Qt
 #include <QEvent>
 #include <QKeyEvent>
-#include <QByteRef>
-
-// KDE
-//#include <kdebug.h>
-//#include <klocale.h>
+#include <QDebug>
 
 // Konsole
 #include "KeyboardTranslator.h"
@@ -59,11 +42,14 @@ using namespace Konsole;
 
 Vt102Emulation::Vt102Emulation()
     : Emulation(),
+     prevCC(0),
      _titleUpdateTimer(new QTimer(this)),
-     _reportFocusEvents(false)
+     _reportFocusEvents(false),
+     _toUtf8(QStringEncoder::Utf8)
 {
   _titleUpdateTimer->setSingleShot(true);
-  QObject::connect(_titleUpdateTimer , SIGNAL(timeout()) , this , SLOT(updateTitle()));
+  QObject::connect(_titleUpdateTimer, &QTimer::timeout,
+          this, &Konsole::Vt102Emulation::updateTitle);
 
   initTokenizer();
   reset();
@@ -86,7 +72,6 @@ void Vt102Emulation::reset()
   _screen[0]->reset();
   resetCharset(1);
   _screen[1]->reset();
-  setCodec(LocaleCodec);
 
   bufferedUpdate();
 }
@@ -133,6 +118,7 @@ void Vt102Emulation::reset()
    - ESC_DE     - Escape codes of the form <ESC><any of `()+*#%'> C
    - CSI_PN     - Escape codes of the form <ESC>'['     {Pn} ';' {Pn} C
    - CSI_PS     - Escape codes of the form <ESC>'['     {Pn} ';' ...  C
+   - CSI_PS_SP  - Escape codes of the form <ESC>'['     {Pn} ';' ... {Space} C
    - CSI_PR     - Escape codes of the form <ESC>'[' '?' {Pn} ';' ...  C
    - CSI_PE     - Escape codes of the form <ESC>'[' '!' {Pn} ';' ...  C
    - VT52       - VT52 escape codes
@@ -145,12 +131,12 @@ void Vt102Emulation::reset()
    The last two forms allow list of arguments. Since the elements of
    the lists are treated individually the same way, they are passed
    as individual tokens to the interpretation. Further, because the
-   meaning of the parameters are names (althought represented as numbers),
+   meaning of the parameters are names (although represented as numbers),
    they are includes within the token ('N').
 
 */
 
-#define TY_CONSTRUCT(T,A,N) ( ((((int)N) & 0xffff) << 16) | ((((int)A) & 0xff) << 8) | (((int)T) & 0xff) )
+#define TY_CONSTRUCT(T,A,N) ( (((static_cast<int>(N)) & 0xffff) << 16) | (((static_cast<int>(A)) & 0xff) << 8) | ((static_cast<int>(T)) & 0xff) )
 
 #define TY_CHR(   )     TY_CONSTRUCT(0,0,0)
 #define TY_CTL(A  )     TY_CONSTRUCT(1,A,0)
@@ -160,10 +146,13 @@ void Vt102Emulation::reset()
 #define TY_CSI_PS(A,N)  TY_CONSTRUCT(5,A,N)
 #define TY_CSI_PN(A  )  TY_CONSTRUCT(6,A,0)
 #define TY_CSI_PR(A,N)  TY_CONSTRUCT(7,A,N)
+#define TY_CSI_PS_SP(A,N)  TY_CONSTRUCT(11,A,N)
 
 #define TY_VT52(A)    TY_CONSTRUCT(8,A,0)
 #define TY_CSI_PG(A)  TY_CONSTRUCT(9,A,0)
 #define TY_CSI_PE(A)  TY_CONSTRUCT(10,A,0)
+#define TY_CSI_PQ(A)  TY_CONSTRUCT(12,A,0)
+#define TY_CSI_PL(A)  TY_CONSTRUCT(13,A,0)
 
 #define MAX_ARGUMENT 4096
 
@@ -182,6 +171,7 @@ void Vt102Emulation::resetTokenizer()
   argc = 0;
   argv[0] = 0;
   argv[1] = 0;
+  prevCC = 0;
 }
 
 void Vt102Emulation::addDigit(int digit)
@@ -196,14 +186,13 @@ void Vt102Emulation::addArgument()
   argv[argc] = 0;
 }
 
-void Vt102Emulation::addToCurrentToken(int cc)
+void Vt102Emulation::addToCurrentToken(wchar_t cc)
 {
   tokenBuffer[tokenBufferPos] = cc;
   tokenBufferPos = qMin(tokenBufferPos+1,MAX_TOKEN_LENGTH-1);
 }
 
 // Character Class flags used while decoding
-
 #define CTL  1  // Control character
 #define CHR  2  // Printable character
 #define CPN  4  // TODO: Document me
@@ -223,7 +212,7 @@ void Vt102Emulation::initTokenizer()
     charClass[i] |= CTL;
   for(i = 32;i < 256; ++i)
     charClass[i] |= CHR;
-  for(s = (quint8*)"@ABCDGHILMPSTXZcdfry"; *s; ++s)
+  for(s = (quint8*)"@ABCDEFGHILMPSTXZbcdfry"; *s; ++s)
     charClass[*s] |= CPN;
   // resize = \e[8;<row>;<col>t
   for(s = (quint8*)"t"; *s; ++s)
@@ -262,25 +251,36 @@ void Vt102Emulation::initTokenizer()
 #define les(P,L,C) (p == (P) && s[L] < 256 && (charClass[s[(L)]] & (C)) == (C))
 #define eec(C)     (p >=  3  && cc == (C))
 #define ees(C)     (p >=  3  && cc < 256 && (charClass[cc] & (C)) == (C))
-#define eps(C)     (p >=  3  && s[2] != '?' && s[2] != '!' && s[2] != '>' && cc < 256 && (charClass[cc] & (C)) == (C))
+#define eps(C)     (p >=  3  && s[2] != '?' && s[2] != '!' && s[2] != '<' && s[2] != '=' && s[2] != '>' && cc < 256 && (charClass[cc] & (C)) == (C))
 #define epp( )     (p >=  3  && s[2] == '?')
 #define epe( )     (p >=  3  && s[2] == '!')
+#define elt( )     (p >=  3  && s[2] == '<')
+#define eeq( )     (p >=  3  && s[2] == '=')
 #define egt( )     (p >=  3  && s[2] == '>')
+#define esp( )     (p ==  4  && s[3] == ' ')
 #define Xpe        (tokenBufferPos >= 2 && tokenBuffer[1] == ']')
-#define Xte        (Xpe      && cc ==  7 )
+#define Xte        (Xpe      && (cc ==  7 || (prevCC == 27 && cc == 92) )) // 27, 92 => "\e\\" (ST, String Terminator)
 #define ces(C)     (cc < 256 && (charClass[cc] & (C)) == (C) && !Xte)
 
-#define ESC 27
 #define CNTL(c) ((c)-'@')
+#define ESC 27
+#define DEL 127
 
 // process an incoming unicode character
-void Vt102Emulation::receiveChar(int cc)
+void Vt102Emulation::receiveChar(wchar_t cc)
 {
-  if (cc == 127)
+  if (cc == DEL)
     return; //VT100: ignore.
 
   if (ces(CTL))
   {
+    // ignore control characters in the text part of Xpe (aka OSC) "ESC]"
+    // escape sequences; this matches what XTERM docs say
+    if (Xpe) {
+        prevCC = cc;
+        return;
+    }
+
     // DEC HACK ALERT! Control Characters are allowed *within* esc sequences in VT100
     // This means, they do neither a resetTokenizer() nor a pushToToken(). Some of them, do
     // of course. Guess this originates from a weakly layered handling of the X-on
@@ -296,7 +296,7 @@ void Vt102Emulation::receiveChar(int cc)
   // advance the state
   addToCurrentToken(cc);
 
-  int* s = tokenBuffer;
+  wchar_t* s = tokenBuffer;
   int  p = tokenBufferPos;
 
   if (getMode(MODE_Ansi))
@@ -305,15 +305,52 @@ void Vt102Emulation::receiveChar(int cc)
     if (lec(1,0,ESC+128)) { s[0] = ESC; receiveChar('['); return; }
     if (les(2,1,GRP)) { return; }
     if (Xte         ) { processWindowAttributeChange(); resetTokenizer(); return; }
-    if (Xpe         ) { return; }
+    if (Xpe         ) { prevCC = cc; return; }
     if (lec(3,2,'?')) { return; }
     if (lec(3,2,'>')) { return; }
     if (lec(3,2,'!')) { return; }
+    if (lec(3,2,'<')) { return; }
+    if (lec(3,2,'=')) { return; }
     if (lun(       )) { processToken( TY_CHR(), applyCharset(cc), 0);   resetTokenizer(); return; }
     if (lec(2,0,ESC)) { processToken( TY_ESC(s[1]), 0, 0);              resetTokenizer(); return; }
     if (les(3,1,SCS)) { processToken( TY_ESC_CS(s[1],s[2]), 0, 0);      resetTokenizer(); return; }
     if (lec(3,1,'#')) { processToken( TY_ESC_DE(s[2]), 0, 0);           resetTokenizer(); return; }
     if (eps(    CPN)) { processToken( TY_CSI_PN(cc), argv[0],argv[1]);  resetTokenizer(); return; }
+    if (esp(       )) { return; }
+    // DECRQM: CSI Pd $ p — absorb '$' intermediate byte and dispatch on 'p'
+    if (eec('$')) { return; } // absorb '$' and wait for final byte
+
+    // CSI with '<' private marker (e.g. SGR mouse reporting: CSI < ... M/m).
+    // Once ESC[< is seen, consume bytes until a CSI final byte (0x40-0x7E).
+    if (elt()) {
+        if (cc >= 0x40 && cc <= 0x7E) {
+            processToken(TY_CSI_PL(cc), 0, 0);
+            resetTokenizer();
+            return;
+        }
+        if (ees(DIG)) { addDigit(cc-'0'); return; }
+        if (eec(';') || eec(':')) { addArgument(); return; }
+        return;
+    }
+
+    // CSI with '=' private marker (e.g. Kitty keyboard protocol: CSI = ... u).
+    // Once ESC[= is seen, consume bytes until a CSI final byte (0x40-0x7E).
+    if (eeq()) {
+        if (cc >= 0x40 && cc <= 0x7E) {
+            processToken(TY_CSI_PQ(cc), 0, 0);
+            resetTokenizer();
+            return;
+        }
+        if (ees(DIG)) { addDigit(cc-'0'); return; }
+        if (eec(';') || eec(':')) { addArgument(); return; }
+        return;
+    }
+
+    if (lec(5, 4, 'q') && s[3] == ' ') {
+      processToken( TY_CSI_PS_SP(cc, argv[0]), argv[0], 0);
+      resetTokenizer();
+      return;
+    }
 
     // resize = \e[8;<row>;<col>t
     if (eps(CPS))
@@ -325,7 +362,14 @@ void Vt102Emulation::receiveChar(int cc)
 
     if (epe(   )) { processToken( TY_CSI_PE(cc), 0, 0); resetTokenizer(); return; }
     if (ees(DIG)) { addDigit(cc-'0'); return; }
-    if (eec(';')) { addArgument();    return; }
+    if (eec(';') || eec(':')) { addArgument(); return; }
+
+    // Per ECMA-48, bytes 0x3C-0x3F (< = > ?) are valid CSI parameter bytes.
+    // When they appear after s[2] (the private-marker position), consume them
+    // so they don't fall through to the dispatch loop or get printed.
+    // This handles sequences like ESC[2:=z where '=' appears mid-parameter.
+    if (p >= 4 && cc >= 0x3C && cc <= 0x3F) { return; }
+
     for (int i=0;i<=argc;i++)
     {
         if (epp())
@@ -395,10 +439,10 @@ void Vt102Emulation::processWindowAttributeChange()
     return;
   }
 
-  QString newValue;
-  newValue.reserve(tokenBufferPos-i-2);
-  for (int j = 0; j < tokenBufferPos-i-2; j++)
-    newValue[j] = tokenBuffer[i+1+j];
+  // copy from the first char after ';', and skipping the ending delimiter
+  // 0x07 or 0x92. Note that as control characters in OSC text parts are
+  // ignored, only the second char in ST ("\e\\") is appended to tokenBuffer.
+  QString newValue = QString::fromWCharArray(tokenBuffer + i + 1, tokenBufferPos-i-2);
 
   _pendingTitleUpdates[attributeToChange] = newValue;
   _titleUpdateTimer->start(20);
@@ -432,7 +476,7 @@ void Vt102Emulation::updateTitle()
    about this mapping.
 */
 
-void Vt102Emulation::processToken(int token, int p, int q)
+void Vt102Emulation::processToken(int token, wchar_t p, int q)
 {
   switch (token)
   {
@@ -509,8 +553,8 @@ void Vt102Emulation::processToken(int token, int p, int q)
     case TY_ESC_CS('+', 'A') :      setCharset           (3,    'A'); break; //VT100
     case TY_ESC_CS('+', 'B') :      setCharset           (3,    'B'); break; //VT100
 
-    case TY_ESC_CS('%', 'G') :      setCodec             (Utf8Codec   ); break; //LINUX
-    case TY_ESC_CS('%', '@') :      setCodec             (LocaleCodec ); break; //LINUX
+    case TY_ESC_CS('%', 'G') :      /*No longer updating codec*/      break; //LINUX
+    case TY_ESC_CS('%', '@') :      /*No longer updating codec*/      break; //LINUX
 
     case TY_ESC_DE('3'      ) : /* Double height line, top half    */
                                 _currentScreen->setLineProperty( LINE_DOUBLEWIDTH , true );
@@ -531,7 +575,7 @@ void Vt102Emulation::processToken(int token, int p, int q)
     case TY_ESC_DE('8'      ) : _currentScreen->helpAlign            (          ); break;
 
 // resize = \e[8;<row>;<col>t
-    case TY_CSI_PS('t',   8) : setImageSize( q /* columns */, p /* lines */ );
+    case TY_CSI_PS('t',   8) : setImageSize( p /*lines */, q /* columns */ );
                                emit imageResizeRequest(QSize(q, p));
                                break;
 
@@ -557,18 +601,27 @@ void Vt102Emulation::processToken(int token, int p, int q)
 
     case TY_CSI_PS('m',   0) : _currentScreen->setDefaultRendition  (          ); break;
     case TY_CSI_PS('m',   1) : _currentScreen->  setRendition     (RE_BOLD     ); break; //VT100
+    case TY_CSI_PS('m',   2) : _currentScreen->  setRendition     (RE_FAINT    ); break;
     case TY_CSI_PS('m',   3) : _currentScreen->  setRendition     (RE_ITALIC   ); break; //VT100
     case TY_CSI_PS('m',   4) : _currentScreen->  setRendition     (RE_UNDERLINE); break; //VT100
     case TY_CSI_PS('m',   5) : _currentScreen->  setRendition     (RE_BLINK    ); break; //VT100
     case TY_CSI_PS('m',   7) : _currentScreen->  setRendition     (RE_REVERSE  ); break;
+    case TY_CSI_PS('m',   8) : _currentScreen->  setRendition     (RE_CONCEAL  ); break;
+    case TY_CSI_PS('m',   9) : _currentScreen->  setRendition     (RE_STRIKEOUT); break;
+    case TY_CSI_PS('m',  53) : _currentScreen->  setRendition     (RE_OVERLINE ); break;
     case TY_CSI_PS('m',  10) : /* IGNORED: mapping related          */ break; //LINUX
     case TY_CSI_PS('m',  11) : /* IGNORED: mapping related          */ break; //LINUX
     case TY_CSI_PS('m',  12) : /* IGNORED: mapping related          */ break; //LINUX
-    case TY_CSI_PS('m',  22) : _currentScreen->resetRendition     (RE_BOLD     ); break;
+    case TY_CSI_PS('m',  21) : _currentScreen->resetRendition     (RE_BOLD     ); break;
+    case TY_CSI_PS('m',  22) : _currentScreen->resetRendition     (RE_BOLD     );
+                               _currentScreen->resetRendition     (RE_FAINT    ); break;
     case TY_CSI_PS('m',  23) : _currentScreen->resetRendition     (RE_ITALIC   ); break; //VT100
     case TY_CSI_PS('m',  24) : _currentScreen->resetRendition     (RE_UNDERLINE); break;
     case TY_CSI_PS('m',  25) : _currentScreen->resetRendition     (RE_BLINK    ); break;
     case TY_CSI_PS('m',  27) : _currentScreen->resetRendition     (RE_REVERSE  ); break;
+    case TY_CSI_PS('m',  28) : _currentScreen->resetRendition     (RE_CONCEAL  ); break;
+    case TY_CSI_PS('m',  29) : _currentScreen->resetRendition     (RE_STRIKEOUT); break;
+    case TY_CSI_PS('m',  55) : _currentScreen->resetRendition     (RE_OVERLINE ); break;
 
     case TY_CSI_PS('m',   30) : _currentScreen->setForeColor         (COLOR_SPACE_SYSTEM,  0); break;
     case TY_CSI_PS('m',   31) : _currentScreen->setForeColor         (COLOR_SPACE_SYSTEM,  1); break;
@@ -624,13 +677,21 @@ void Vt102Emulation::processToken(int token, int p, int q)
     case TY_CSI_PS('x',   0) :      reportTerminalParms  (         2); break; //VT100
     case TY_CSI_PS('x',   1) :      reportTerminalParms  (         3); break; //VT100
 
+    case TY_CSI_PS_SP('q',   0) : /* fall through */
+    case TY_CSI_PS_SP('q',   1) : emit cursorChanged(KeyboardCursorShape::BlockCursor,     true ); break;
+    case TY_CSI_PS_SP('q',   2) : emit cursorChanged(KeyboardCursorShape::BlockCursor,     false); break;
+    case TY_CSI_PS_SP('q',   3) : emit cursorChanged(KeyboardCursorShape::UnderlineCursor, true ); break;
+    case TY_CSI_PS_SP('q',   4) : emit cursorChanged(KeyboardCursorShape::UnderlineCursor, false); break;
+    case TY_CSI_PS_SP('q',   5) : emit cursorChanged(KeyboardCursorShape::IBeamCursor,     true ); break;
+    case TY_CSI_PS_SP('q',   6) : emit cursorChanged(KeyboardCursorShape::IBeamCursor,     false); break;
+
     case TY_CSI_PN('@'      ) : _currentScreen->insertChars          (p         ); break;
     case TY_CSI_PN('A'      ) : _currentScreen->cursorUp             (p         ); break; //VT100
     case TY_CSI_PN('B'      ) : _currentScreen->cursorDown           (p         ); break; //VT100
     case TY_CSI_PN('C'      ) : _currentScreen->cursorRight          (p         ); break; //VT100
     case TY_CSI_PN('D'      ) : _currentScreen->cursorLeft           (p         ); break; //VT100
-    case TY_CSI_PN('E'      ) : /* Not implemented: cursor next p lines */         break; //VT100
-    case TY_CSI_PN('F'      ) : /* Not implemented: cursor preceding p lines */    break; //VT100
+    case TY_CSI_PN('E'      ) : _currentScreen->cursorNextLine       (p         ); break; //VT100
+    case TY_CSI_PN('F'      ) : _currentScreen->cursorPreviousLine   (p         ); break; //VT100
     case TY_CSI_PN('G'      ) : _currentScreen->setCursorX           (p         ); break; //LINUX
     case TY_CSI_PN('H'      ) : _currentScreen->setCursorYX          (p,      q); break; //VT100
     case TY_CSI_PN('I'      ) : _currentScreen->tab                  (p         ); break;
@@ -641,6 +702,7 @@ void Vt102Emulation::processToken(int token, int p, int q)
     case TY_CSI_PN('T'      ) : _currentScreen->scrollDown           (p         ); break;
     case TY_CSI_PN('X'      ) : _currentScreen->eraseChars           (p         ); break;
     case TY_CSI_PN('Z'      ) : _currentScreen->backtab              (p         ); break;
+    case TY_CSI_PN('b'      ) : _currentScreen->repeatChars          (p         ); break;
     case TY_CSI_PN('c'      ) :      reportTerminalType   (          ); break; //VT100
     case TY_CSI_PN('d'      ) : _currentScreen->setCursorY           (p         ); break; //LINUX
     case TY_CSI_PN('f'      ) : _currentScreen->setCursorYX          (p,      q); break; //VT100
@@ -721,7 +783,7 @@ void Vt102Emulation::processToken(int token, int p, int q)
     //Note about mouse modes:
     //There are four mouse modes which xterm-compatible terminals can support - 1000,1001,1002,1003
     //Konsole currently supports mode 1000 (basic mouse press and release) and mode 1002 (dragging the mouse).
-    //TODO:  Implementation of mouse modes 1001 (something called hilight tracking) and
+    //TODO:  Implementation of mouse modes 1001 (something called highlight tracking) and
     //1003 (a slight variation on dragging the mouse)
     //
 
@@ -789,6 +851,44 @@ void Vt102Emulation::processToken(int token, int p, int q)
     //FIXME: weird DEC reset sequence
     case TY_CSI_PE('p'      ) : /* IGNORED: reset         (        ) */ break;
 
+    // DECRQM — Request Mode (Host To Terminal)
+    // When the '$' intermediate byte is absorbed by the tokenizer, the natural
+    // for-loop dispatch produces TY_CSI_PR('p',N) for DEC private modes and
+    // TY_CSI_PS('p',N) for ANSI modes — same token types konsole uses.
+    //
+    // ANSI mode queries: CSI Pd $ p  →  TY_CSI_PS('p', Pd)
+    // NOTE: Screen-owned modes (values < MODES_SCREEN=6) must be queried
+    // via _currentScreen->getMode() since Screen::reset() initialises them
+    // independently of the emulation's _currentModes (which starts zeroed).
+    case TY_CSI_PS('p',   2) : reportAnsiMode( 2, 2); break; // KAM (Keyboard Action) - Not supported
+    case TY_CSI_PS('p',   4) : reportAnsiMode( 4, _currentScreen->getMode(MODE_Insert) ? 1 : 2); break; // IRM
+    case TY_CSI_PS('p',  10) : reportAnsiMode(10, 4); break; // HEM (Horizontal Editing) - Permanently reset
+    case TY_CSI_PS('p',  20) : reportAnsiMode(20, getMode(MODE_NewLine) ? 1 : 2); break; // LNM
+
+    // DEC private mode queries: CSI ? Pd $ p  →  TY_CSI_PR('p', Pd)
+    case TY_CSI_PR('p',   1) : reportDecMode(  1, getMode(MODE_AppCuKeys) ? 1 : 2); break; // DECCKM
+    case TY_CSI_PR('p',   2) : reportDecMode(  2, getMode(MODE_Ansi) ? 1 : 2);      break; // DECANM
+    case TY_CSI_PR('p',   3) : reportDecMode(  3, getMode(MODE_132Columns) ? 1 : 2); break; // DECCOLM
+    case TY_CSI_PR('p',   4) : reportDecMode(  4, 4); break; // DECSCLM (Scrolling) - Permanently reset
+    case TY_CSI_PR('p',   5) : reportDecMode(  5, _currentScreen->getMode(MODE_Screen) ? 1 : 2); break; // DECSCNM
+    case TY_CSI_PR('p',   6) : reportDecMode(  6, _currentScreen->getMode(MODE_Origin) ? 1 : 2); break; // DECOM
+    case TY_CSI_PR('p',   7) : reportDecMode(  7, _currentScreen->getMode(MODE_Wrap) ? 1 : 2);   break; // DECAWM
+    case TY_CSI_PR('p',   8) : reportDecMode(  8, 4); break; // DECARM (Autorepeat) - Permanently reset
+    case TY_CSI_PR('p',   9) : reportDecMode(  9, 4); break; // DECINLM (Interlace) - Permanently reset
+    case TY_CSI_PR('p',  10) : reportDecMode( 10, 4); break; // DECEDM (Edit Mode) - Permanently reset
+    case TY_CSI_PR('p',  25) : reportDecMode( 25, _currentScreen->getMode(MODE_Cursor) ? 1 : 2); break; // DECTCEM
+    case TY_CSI_PR('p',  47) : reportDecMode( 47, getMode(MODE_AppScreen) ? 1 : 2);            break; // Alt screen
+    case TY_CSI_PR('p', 1000) : reportDecMode(1000, getMode(MODE_Mouse1000) ? 1 : 2);          break; // VT200 mouse
+    case TY_CSI_PR('p', 1002) : reportDecMode(1002, getMode(MODE_Mouse1002) ? 1 : 2);          break; // Cell motion mouse
+    case TY_CSI_PR('p', 1003) : reportDecMode(1003, getMode(MODE_Mouse1003) ? 1 : 2);          break; // All motion mouse
+    case TY_CSI_PR('p', 1004) : reportDecMode(1004, _reportFocusEvents ? 1 : 2);               break; // Focus events
+    case TY_CSI_PR('p', 1005) : reportDecMode(1005, getMode(MODE_Mouse1005) ? 1 : 2);          break; // UTF-8 mouse
+    case TY_CSI_PR('p', 1006) : reportDecMode(1006, getMode(MODE_Mouse1006) ? 1 : 2);          break; // SGR mouse
+    case TY_CSI_PR('p', 1015) : reportDecMode(1015, getMode(MODE_Mouse1015) ? 1 : 2);          break; // URXVT mouse
+    case TY_CSI_PR('p', 1047) : reportDecMode(1047, getMode(MODE_AppScreen) ? 1 : 2);          break; // Alt screen (xterm)
+    case TY_CSI_PR('p', 1049) : reportDecMode(1049, getMode(MODE_AppScreen) ? 1 : 2);          break; // Alt screen + cursor
+    case TY_CSI_PR('p', 2004) : reportDecMode(2004, getMode(MODE_BracketedPaste) ? 1 : 2);     break; // Bracketed paste
+
     //FIXME: when changing between vt52 and ansi mode evtl do some resetting.
     case TY_VT52('A'      ) : _currentScreen->cursorUp             (         1); break; //VT52
     case TY_VT52('B'      ) : _currentScreen->cursorDown           (         1); break; //VT52
@@ -811,7 +911,11 @@ void Vt102Emulation::processToken(int token, int p, int q)
     case TY_CSI_PG('c'      ) :  reportSecondaryAttributes(          ); break; //VT100
 
     default:
-        reportDecodingError();
+        // Silently ignore all CSI '<' and '=' (private marker) sequences.
+        // Token type 12 = TY_CSI_PQ ('='), 13 = TY_CSI_PL ('<');
+        // these are consumed but unimplemented.
+        if ((token & 0xff) != 12 && (token & 0xff) != 13)
+            reportDecodingError();
         break;
   };
 }
@@ -834,8 +938,12 @@ void Vt102Emulation::sendString(const char* s , int length)
 
 void Vt102Emulation::reportCursorPosition()
 {
-  char tmp[20];
-  sprintf(tmp,"\033[%d;%dR",_currentScreen->getCursorY()+1,_currentScreen->getCursorX()+1);
+  const size_t sz = 20;
+  char tmp[sz];
+  const size_t r = snprintf(tmp, sz, "\033[%d;%dR",_currentScreen->getCursorY()+1,_currentScreen->getCursorX()+1);
+  if (sz <= r) {
+    qWarning("Vt102Emulation::reportCursorPosition: Buffer too small\n");
+  }
   sendString(tmp);
 }
 
@@ -854,7 +962,7 @@ void Vt102Emulation::reportTerminalType()
 
 void Vt102Emulation::reportSecondaryAttributes()
 {
-  // Seconday device attribute response (Request was: ^[[>0c or ^[[>c)
+  // Secondary device attribute response (Request was: ^[[>0c or ^[[>c)
   if (getMode(MODE_Ansi))
     sendString("\033[>0;115;0c"); // Why 115?  ;)
   else
@@ -865,8 +973,12 @@ void Vt102Emulation::reportSecondaryAttributes()
 void Vt102Emulation::reportTerminalParms(int p)
 // DECREPTPARM
 {
-  char tmp[100];
-  sprintf(tmp,"\033[%d;1;1;112;112;1;0x",p); // not really true.
+  const size_t sz = 100;
+  char tmp[sz];
+  const size_t r = snprintf(tmp, sz, "\033[%d;1;1;112;112;1;0x",p); // not really true.
+  if (sz <= r) {
+    qWarning("Vt102Emulation::reportTerminalParms: Buffer too small\n");
+  }
   sendString(tmp);
 }
 
@@ -874,6 +986,31 @@ void Vt102Emulation::reportStatus()
 {
   sendString("\033[0n"); //VT100. Device status report. 0 = Ready.
 }
+
+// DECRPM — Report Mode (Terminal To Host), response to DECRQM
+// Responds to an ANSI mode query (CSI Pd $ p) with: CSI Pd ; Pm $ y
+void Vt102Emulation::reportAnsiMode(int mode, int status)
+{
+    const size_t sz = 32;
+    char tmp[sz];
+    const size_t r = snprintf(tmp, sz, "\033[%d;%d$y", mode, status);
+    if (sz <= r)
+        qWarning("Vt102Emulation::reportAnsiMode: Buffer too small\n");
+    sendString(tmp);
+}
+
+// DECRPM — Report Mode (Terminal To Host), response to DECRQM
+// Responds to a DEC private mode query (CSI ? Pd $ p) with: CSI ? Pd ; Pm $ y
+void Vt102Emulation::reportDecMode(int mode, int status)
+{
+    const size_t sz = 32;
+    char tmp[sz];
+    const size_t r = snprintf(tmp, sz, "\033[?%d;%d$y", mode, status);
+    if (sz <= r)
+        qWarning("Vt102Emulation::reportDecMode: Buffer too small\n");
+    sendString(tmp);
+}
+
 
 void Vt102Emulation::reportAnswerBack()
 {
@@ -885,30 +1022,56 @@ void Vt102Emulation::reportAnswerBack()
 
 /*!
     `cx',`cy' are 1-based.
-    `eventType' indicates the button pressed (0-2)
-                or a general mouse release (3).
+    `cb' indicates the button pressed or released (0-2) or scroll event (4-5).
 
     eventType represents the kind of mouse action that occurred:
-        0 = Mouse button press or release
+        0 = Mouse button press
         1 = Mouse drag
+        2 = Mouse button release
 */
 
 void Vt102Emulation::sendMouseEvent( int cb, int cx, int cy , int eventType )
 {
-  if (cx < 1 || cy < 1)
-    return;
+    if (cx < 1 || cy < 1)
+      return;
 
-  // normal buttons are passed as 0x20 + button,
-  // mouse wheel (buttons 4,5) as 0x5c + button
-  if (cb >= 4)
-    cb += 0x3c;
+    // With the exception of the 1006 mode, button release is encoded in cb.
+    // Note that if multiple extensions are enabled, the 1006 is used, so it's okay to check for only that.
+    if (eventType == 2 && !getMode(MODE_Mouse1006))
+        cb = 3;
 
-  //Mouse motion handling
-  if ((getMode(MODE_Mouse1002) || getMode(MODE_Mouse1003)) && eventType == 1)
+    // normal buttons are passed as 0x20 + button,
+    // mouse wheel (buttons 4,5) as 0x5c + button
+    if (cb >= 4)
+      cb += 0x3c;
+
+    //Mouse motion handling
+    if ((getMode(MODE_Mouse1002) || getMode(MODE_Mouse1003)) && eventType == 1)
       cb += 0x20; //add 32 to signify motion event
 
-  char command[20];
-  sprintf(command,"\033[M%c%c%c",cb+0x20,cx+0x20,cy+0x20);
+    char command[40];
+    command[0] = '\0';
+    // Check the extensions in decreasing order of preference. Encoding the release event above assumes that 1006 comes first.
+    if (getMode(MODE_Mouse1006)) {
+        snprintf(command, sizeof(command), "\033[<%d;%d;%d%c", cb, cx, cy, eventType == 2 ? 'm' : 'M');
+    } else if (getMode(MODE_Mouse1015)) {
+        snprintf(command, sizeof(command), "\033[%d;%d;%dM", cb + 0x20, cx, cy);
+    } else if (getMode(MODE_Mouse1005)) {
+        if (cx <= 2015 && cy <= 2015) {
+            // The xterm extension uses UTF-8 (up to 2 bytes) to encode
+            // coordinate+32, no matter what the locale is. We could easily
+            // convert manually, but QString can also do it for us.
+            QChar coords[2];
+            coords[0] = QChar(cx + 0x20);
+            coords[1] = QChar(cy + 0x20);
+            QString coordsStr = QString(coords, 2);
+            QByteArray utf8 = coordsStr.toUtf8();
+            snprintf(command, sizeof(command), "\033[M%c%s", cb + 0x20, utf8.constData());
+        }
+    } else if (cx <= 223 && cy <= 223) {
+        snprintf(command, sizeof(command), "\033[M%c%c%c", cb + 0x20, cx + 0x20, cy + 0x20);
+    }
+
   sendString(command);
 }
 
@@ -946,10 +1109,10 @@ void Vt102Emulation::sendText( const QString& text )
                     0,
                     Qt::NoModifier,
                     text);
-    sendKeyEvent(&event); // expose as a big fat keypress event
+    sendKeyEvent(&event, false); // expose as a big fat keypress event
   }
 }
-void Vt102Emulation::sendKeyEvent( QKeyEvent* event )
+void Vt102Emulation::sendKeyEvent(QKeyEvent* event, bool fromPaste)
 {
     Qt::KeyboardModifiers modifiers = event->modifiers();
     KeyboardTranslator::States states = KeyboardTranslator::NoState;
@@ -963,12 +1126,17 @@ void Vt102Emulation::sendKeyEvent( QKeyEvent* event )
         states |= KeyboardTranslator::ApplicationKeypadState;
 
     // check flow control state
-    if (modifiers & Qt::ControlModifier)
+    if (modifiers & KeyboardTranslator::CTRL_MOD)
     {
-        if (event->key() == Qt::Key_S)
+        switch (event->key()) {
+        case Qt::Key_S:
             emit flowControlKeyPressed(true);
-        else if (event->key() == Qt::Key_Q)
+            break;
+        case Qt::Key_Q:
+        case Qt::Key_C: // cancel flow control
             emit flowControlKeyPressed(false);
+            break;
+        }
     }
 
     // lookup key binding
@@ -987,6 +1155,7 @@ void Vt102Emulation::sendKeyEvent( QKeyEvent* event )
         // (unless there is an entry defined for this particular combination
         //  in the keyboard modifier)
         bool wantsAltModifier = entry.modifiers() & entry.modifierMask() & Qt::AltModifier;
+        bool wantsMetaModifier = entry.modifiers() & entry.modifierMask() & Qt::MetaModifier;
         bool wantsAnyModifier = entry.state() &
                                 entry.stateMask() & KeyboardTranslator::AnyModifierState;
 
@@ -995,19 +1164,29 @@ void Vt102Emulation::sendKeyEvent( QKeyEvent* event )
         {
             textToSend.prepend("\033");
         }
+        if ( modifiers & Qt::MetaModifier && !(wantsMetaModifier || wantsAnyModifier)
+             && !event->text().isEmpty() )
+        {
+            textToSend.prepend("\030@s");
+        }
 
         if ( entry.command() != KeyboardTranslator::NoCommand )
         {
-            if (entry.command() & KeyboardTranslator::EraseCommand)
+            if (entry.command() & KeyboardTranslator::EraseCommand) {
                 textToSend += eraseChar();
+            } else {
+                Q_EMIT handleCommandFromKeyboard(entry.command());
+            }
 
             // TODO command handling
         }
         else if ( !entry.text().isEmpty() )
         {
-            textToSend += _codec->fromUnicode(entry.text(true,modifiers));
+	    QString str = QString::fromUtf8(entry.text(true,modifiers));
+	    QByteArray bytes = _toUtf8(str);
+	    textToSend += bytes;
         }
-        else if((modifiers & Qt::ControlModifier) && event->key() >= 0x40 && event->key() < 0x5f) {
+        else if((modifiers & KeyboardTranslator::CTRL_MOD) && event->key() >= 0x40 && event->key() < 0x5f) {
             textToSend += (event->key() & 0x1f);
         }
         else if(event->key() == Qt::Key_Tab) {
@@ -1020,10 +1199,14 @@ void Vt102Emulation::sendKeyEvent( QKeyEvent* event )
             textToSend += "\033[6~";
         }
         else {
-            textToSend += _codec->fromUnicode(event->text());
+	    QByteArray bytes = _toUtf8(event->text());
+	    textToSend += bytes;
         }
 
-        sendData( textToSend.constData() , textToSend.length() );
+        if (!fromPaste && textToSend.length()) {
+            Q_EMIT outputFromKeypressEvent();
+        }
+        Q_EMIT sendData( textToSend.constData() , textToSend.length() );
     }
     else
     {
@@ -1034,7 +1217,7 @@ void Vt102Emulation::sendKeyEvent( QKeyEvent* event )
                                          "into characters to send to the terminal "
                                          "is missing.");
         reset();
-        receiveData( translatorError.toUtf8().constData() , translatorError.count() );
+        receiveData( translatorError.toUtf8().constData() , translatorError.size() );
     }
 }
 
@@ -1066,7 +1249,7 @@ void Vt102Emulation::sendKeyEvent( QKeyEvent* event )
 
 // Apply current character map.
 
-unsigned short Vt102Emulation::applyCharset(unsigned short c)
+wchar_t Vt102Emulation::applyCharset(wchar_t c)
 {
   if (CHARSET.graphic && 0x5f <= c && c <= 0x7e) return vt100_graphics[c-0x5f];
   if (CHARSET.pound && c == '#' ) return 0xa3; //This mode is obsolete
@@ -1084,7 +1267,7 @@ unsigned short Vt102Emulation::applyCharset(unsigned short c)
 void Vt102Emulation::resetCharset(int scrno)
 {
   _charset[scrno].cu_cs = 0;
-  strncpy(_charset[scrno].charset,"BBBB",4);
+  qstrncpy(_charset[scrno].charset,"BBBB",4);
   _charset[scrno].sa_graphic = false;
   _charset[scrno].sa_pound = false;
   _charset[scrno].graphic = false;
@@ -1169,6 +1352,9 @@ void Vt102Emulation::resetModes()
   resetMode(MODE_Mouse1001);  saveMode(MODE_Mouse1001);
   resetMode(MODE_Mouse1002);  saveMode(MODE_Mouse1002);
   resetMode(MODE_Mouse1003);  saveMode(MODE_Mouse1003);
+  resetMode(MODE_Mouse1005);  saveMode(MODE_Mouse1005);
+  resetMode(MODE_Mouse1006);  saveMode(MODE_Mouse1006);
+  resetMode(MODE_Mouse1015);  saveMode(MODE_Mouse1015);
   resetMode(MODE_BracketedPaste);  saveMode(MODE_BracketedPaste);
 
   resetMode(MODE_AppScreen);  saveMode(MODE_AppScreen);
@@ -1265,36 +1451,19 @@ char Vt102Emulation::eraseChar() const
 {
   KeyboardTranslator::Entry entry = _keyTranslator->findEntry(
                                             Qt::Key_Backspace,
-                                            0,
-                                            0);
-  if ( entry.text().count() > 0 )
-      return entry.text()[0];
+                                            Qt::NoModifier,
+                                            KeyboardTranslator::NoState);
+  if ( entry.text().size() > 0 )
+      return entry.text().at(0);
   else
       return '\b';
-}
-
-// print contents of the scan buffer
-static void hexdump(int* s, int len)
-{ int i;
-  for (i = 0; i < len; i++)
-  {
-    if (s[i] == '\\')
-      printf("\\\\");
-    else
-    if ((s[i]) > 32 && s[i] < 127)
-      printf("%c",s[i]);
-    else
-      printf("\\%04x(hex)",s[i]);
-  }
 }
 
 void Vt102Emulation::reportDecodingError()
 {
   if (tokenBufferPos == 0 || ( tokenBufferPos == 1 && (tokenBuffer[0] & 0xff) >= 32) )
     return;
-  printf("Undecodable sequence: ");
-  hexdump(tokenBuffer,tokenBufferPos);
-  printf("\n");
+  qCDebug(qtermwidgetLogger) << "Undecodable sequence:" << QString::fromWCharArray(tokenBuffer, tokenBufferPos);
 }
 
 //#include "Vt102Emulation.moc"

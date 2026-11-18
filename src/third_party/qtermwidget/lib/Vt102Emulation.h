@@ -24,7 +24,7 @@
 #define VT102EMULATION_H
 
 // Standard Library
-#include <stdio.h>
+#include <cstdio>
 
 // Qt
 #include <QKeyEvent>
@@ -39,7 +39,7 @@
 #define MODE_AppCuKeys       (MODES_SCREEN+1)   // Application cursor keys (DECCKM)
 #define MODE_AppKeyPad       (MODES_SCREEN+2)   //
 #define MODE_Mouse1000       (MODES_SCREEN+3)   // Send mouse X,Y position on press and release
-#define MODE_Mouse1001       (MODES_SCREEN+4)   // Use Hilight mouse tracking
+#define MODE_Mouse1001       (MODES_SCREEN+4)   // Use Highlight mouse tracking
 #define MODE_Mouse1002       (MODES_SCREEN+5)   // Use cell motion mouse tracking
 #define MODE_Mouse1003       (MODES_SCREEN+6)   // Use all motion mouse tracking
 #define MODE_Mouse1005       (MODES_SCREEN+7)   // Xterm-style extended coordinates
@@ -82,27 +82,27 @@ Q_OBJECT
 public:
   /** Constructs a new emulation */
   Vt102Emulation();
-  ~Vt102Emulation();
+  ~Vt102Emulation() override;
 
   // reimplemented from Emulation
-  virtual void clearEntireScreen();
-  virtual void reset();
-  virtual char eraseChar() const;
+  void clearEntireScreen() override;
+  void reset() override;
+  char eraseChar() const override;
 
 public slots:
   // reimplemented from Emulation
-  virtual void sendString(const char*,int length = -1);
-  virtual void sendText(const QString& text);
-  virtual void sendKeyEvent(QKeyEvent*);
-  virtual void sendMouseEvent(int buttons, int column, int line, int eventType);
+  void sendString(const char*,int length = -1) override;
+  void sendText(const QString& text) override;
+  void sendKeyEvent(QKeyEvent*, bool fromPaste) override;
+  void sendMouseEvent(int buttons, int column, int line, int eventType) override;
   virtual void focusLost();
   virtual void focusGained();
 
 protected:
   // reimplemented from Emulation
-  virtual void setMode(int mode);
-  virtual void resetMode(int mode);
-  virtual void receiveChar(int cc);
+  void setMode(int mode) override;
+  void resetMode(int mode) override;
+  void receiveChar(wchar_t cc) override;
 
 private slots:
   //causes changeTitle() to be emitted for each (int,QString) pair in pendingTitleUpdates
@@ -110,7 +110,7 @@ private slots:
   void updateTitle();
 
 private:
-  unsigned short applyCharset(unsigned short c);
+  wchar_t applyCharset(wchar_t c);
   void setCharset(int n, int cs);
   void useCharset(int n);
   void setAndUseCharset(int n, int cs);
@@ -133,9 +133,9 @@ private:
   void resetModes();
 
   void resetTokenizer();
-  #define MAX_TOKEN_LENGTH 80
-  void addToCurrentToken(int cc);
-  int tokenBuffer[MAX_TOKEN_LENGTH]; //FIXME: overflow?
+  #define MAX_TOKEN_LENGTH 256 // Max length of tokens (e.g. window title)
+  void addToCurrentToken(wchar_t cc);
+  wchar_t tokenBuffer[MAX_TOKEN_LENGTH]; //FIXME: overflow?
   int tokenBufferPos;
 #define MAXARGS 15
   void addDigit(int dig);
@@ -143,6 +143,7 @@ private:
   int argv[MAXARGS];
   int argc;
   void initTokenizer();
+  int prevCC;
 
   // Set of flags for each of the ASCII characters which indicates
   // what category they fall into (printable character, control, digit etc.)
@@ -151,8 +152,9 @@ private:
 
   void reportDecodingError();
 
-  void processToken(int code, int p, int q);
+  void processToken(int code, wchar_t p, int q);
   void processWindowAttributeChange();
+  void requestWindowAttribute(int);
 
   void reportTerminalType();
   void reportSecondaryAttributes();
@@ -160,6 +162,9 @@ private:
   void reportAnswerBack();
   void reportCursorPosition();
   void reportTerminalParms(int p);
+  // DECRPM responses to DECRQM queries
+  void reportAnsiMode(int mode, int status);
+  void reportDecMode(int mode, int status);
 
   void onScrollLock();
   void scrollLock(const bool lock);
@@ -191,7 +196,9 @@ private:
   QHash<int,QString> _pendingTitleUpdates;
   QTimer* _titleUpdateTimer;
 
-    bool _reportFocusEvents;
+  bool _reportFocusEvents;
+
+  QStringEncoder _toUtf8;
 };
 
 }

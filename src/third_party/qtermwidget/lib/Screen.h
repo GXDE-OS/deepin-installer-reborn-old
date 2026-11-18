@@ -25,6 +25,7 @@
 
 // Qt
 #include <QRect>
+#include <QSet>
 #include <QTextStream>
 #include <QVarLengthArray>
 
@@ -93,6 +94,16 @@ public:
      * The cursor will stop at the first column.
      */
     void cursorLeft(int n);
+    /**
+     * Moves cursor to beginning of the line by @p n lines down.
+     * The cursor will stop at the beginning of the line.
+     */
+    void cursorNextLine(int n);
+    /**
+     * Moves cursor to beginning of the line by @p n lines up.
+     * The cursor will stop at the beginning of the line.
+     */
+    void cursorPreviousLine(int n);
     /**
      * Move the cursor to the right by @p n columns.
      * The cursor will stop at the right-most column.
@@ -198,6 +209,11 @@ public:
      */
     void insertChars(int n);
     /**
+     * Repeat the preceding graphic character @count times, including SPACE.
+     * If @count is 0 then the character is repeated once.
+     */
+    void repeatChars(int count);
+    /**
      * Removes @p n lines beginning from the current cursor position.
      * The position of the cursor is not altered.
      * If @p n is 0 then one line is removed.
@@ -284,7 +300,7 @@ public:
     void setForeColor(int space, int color);
     /**
      * Sets the cursor's background color.
-     * @param space The color space used by the @p color argumnet.
+     * @param space The color space used by the @p color argument.
      * @param color The new background color.  The meaning of this depends on
      * the color @p space used.
      *
@@ -341,7 +357,7 @@ public:
      * is inserted at the current cursor position, otherwise it will replace the
      * character already at the current cursor position.
      */
-    void displayCharacter(unsigned short c);
+    void displayCharacter(wchar_t c);
 
     // Do composition with last shown character FIXME: Not implemented yet for KDE 4
     void compose(const QString& compose);
@@ -545,7 +561,26 @@ public:
       */
     static void fillWithDefaultChar(Character* dest, int count);
 
+    QSet<uint> usedExtendedChars() const
+    {
+        QSet<uint> result;
+        for (int i = 0; i < lines; ++i)
+        {
+            const ImageLine &il = screenLines[i];
+            for (int j = 0; j < columns; ++j)
+            {
+                if (il[j].rendition & RE_EXTENDED_CHAR)
+                {
+                    result << il[j].character;
+                }
+            }
+        }
+        return result;
+    }
+
 private:
+    Screen(const Screen &) = delete;
+    Screen &operator=(const Screen &) = delete;
 
     //copies a line of text from the screen or history into a stream using a
     //specified character decoder.  Returns the number of lines actually copied,
@@ -632,8 +667,8 @@ private:
     int _bottomMargin;
 
     // states ----------------
-    int currentModes[MODES_SCREEN];
-    int savedModes[MODES_SCREEN];
+    bool currentModes[MODES_SCREEN];
+    bool savedModes[MODES_SCREEN];
 
     // ----------------------------
 
@@ -666,6 +701,9 @@ private:
 
     // last position where we added a character
     int lastPos;
+
+    // used in REP (repeating char)
+    unsigned short lastDrawnChar;
 
     static Character defaultChar;
 };

@@ -1,7 +1,15 @@
-Name: qtermwidget
-Author: konsole authors
-License: GPLv2
-Version: 0.7.1
-Home: https://github.com/descent/qt_terminal
-Description: Terminal widget for Qt5
+# Vendored: qtermwidget
 
+Upstream: https://github.com/lxqt/qtermwidget
+Tag: 2.4.0 (Qt 6 native)
+License: GPLv2+ (see LICENSE, LICENSE.BSD-3-clause, LICENSE.LGPL2+)
+
+Vendored for use as a static library inside deepin-installer. Differences from
+upstream:
+
+* CMakeLists.txt is slimmed down: no lxqt-build-tools dependency, no
+  pkg-config file, no install/export of the library itself, no example or
+  python bindings, no translation build (SEARCHBAR .ts files dropped).
+* kb-layouts/ and color-schemes/ are installed to
+  ${CMAKE_INSTALL_DATADIR}/qtermwidget6 at runtime instead of being bundled
+  as .qrc resources.
