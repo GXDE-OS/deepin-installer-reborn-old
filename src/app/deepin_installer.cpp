@@ -38,8 +38,6 @@ int main(int argc, char* argv[]) {
   Utils::AutoScreenScale();
 
   QApplication app(argc, argv);
-  app.setAttribute(Qt::AA_UseHighDpiPixmaps);
-  app.setAttribute(Qt::AA_EnableHighDpiScaling);
   app.setApplicationDisplayName("Deepin Installer Reborn");
   app.setApplicationName("deepin-installer");
   app.setApplicationVersion(installer::kAppVersion);

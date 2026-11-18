@@ -18,6 +18,7 @@
 #include "sysinfo/proc_partitions.h"
 
 #include <QDebug>
+#include <QRegularExpression>
 
 #include "base/file_util.h"
 
@@ -27,14 +28,14 @@ QList<PartitionItem> ParsePartitionItems() {
   PartitionItemList result;
 
   const QString content(ReadFile("/proc/partitions"));
-  const QStringList lines(content.split("\n", QString::SkipEmptyParts));
-  const QRegExp space_exp("\\s+");
+  const QStringList lines(content.split("\n", Qt::SkipEmptyParts));
+  const QRegularExpression space_exp("\\s+");
   for (const QString& line : lines) {
     // Skip header line.
     if (line.startsWith("major")) {
       continue;
     }
-    const QStringList parts(line.split(space_exp, QString::SkipEmptyParts));
+    const QStringList parts(line.split(space_exp, Qt::SkipEmptyParts));
     if (parts.length() != 4) {
       qWarning() << "Invalid partition item:" << parts;
       continue;

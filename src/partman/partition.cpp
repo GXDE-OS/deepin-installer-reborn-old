@@ -157,22 +157,22 @@ qint64 Partition::getSectorLength() const {
 }
 
 QDebug& operator<<(QDebug& debug, const Partition& partition) {
-  debug << "Partition: {" << endl
-        << "    path:" << partition.path << endl
-        << "    number:" << partition.partition_number << endl
-        << "    fs:" << partition.fs << endl
-        << "    type:" << partition.type << endl
-        << "    status:" << partition.status << endl
-        << "    os:" << partition.os << endl
-        << "    busy:" << partition.busy << endl
-        << "    label:" << partition.label << endl
-        << "    name:" << partition.name << endl
-        << "    mount point:" << partition.mount_point << endl
-        << "    start:" << partition.start_sector << endl
-        << "    end:" << partition.end_sector << endl
-        << "    sector size:" << partition.sector_size << endl
-        << "    flags:" << partition.flags << endl
-        << "}" << endl;
+  debug << "Partition: {" << Qt::endl
+        << "    path:" << partition.path << Qt::endl
+        << "    number:" << partition.partition_number << Qt::endl
+        << "    fs:" << partition.fs << Qt::endl
+        << "    type:" << partition.type << Qt::endl
+        << "    status:" << partition.status << Qt::endl
+        << "    os:" << partition.os << Qt::endl
+        << "    busy:" << partition.busy << Qt::endl
+        << "    label:" << partition.label << Qt::endl
+        << "    name:" << partition.name << Qt::endl
+        << "    mount point:" << partition.mount_point << Qt::endl
+        << "    start:" << partition.start_sector << Qt::endl
+        << "    end:" << partition.end_sector << Qt::endl
+        << "    sector size:" << partition.sector_size << Qt::endl
+        << "    flags:" << partition.flags << Qt::endl
+        << "}" << Qt::endl;
   return debug;
 }
 
@@ -180,22 +180,22 @@ QDebug& operator<<(QDebug& debug, const Partition::Ptr partition) {
   if (partition.isNull())
     debug << "a partition with null value: " << partition.data();
   else
-    debug << "Partition: {" << endl
-          << "    path:" << partition->path << endl
-          << "    number:" << partition->partition_number << endl
-          << "    fs:" << partition->fs << endl
-          << "    type:" << partition->type << endl
-          << "    status:" << partition->status << endl
-          << "    os:" << partition->os << endl
-          << "    busy:" << partition->busy << endl
-          << "    label:" << partition->label << endl
-          << "    name:" << partition->name << endl
-          << "    mount point:" << partition->mount_point << endl
-          << "    start:" << partition->start_sector << endl
-          << "    end:" << partition->end_sector << endl
-          << "    sector size:" << partition->sector_size << endl
-          << "    flags:" << partition->flags << endl
-          << "    }" << endl;
+    debug << "Partition: {" << Qt::endl
+          << "    path:" << partition->path << Qt::endl
+          << "    number:" << partition->partition_number << Qt::endl
+          << "    fs:" << partition->fs << Qt::endl
+          << "    type:" << partition->type << Qt::endl
+          << "    status:" << partition->status << Qt::endl
+          << "    os:" << partition->os << Qt::endl
+          << "    busy:" << partition->busy << Qt::endl
+          << "    label:" << partition->label << Qt::endl
+          << "    name:" << partition->name << Qt::endl
+          << "    mount point:" << partition->mount_point << Qt::endl
+          << "    start:" << partition->start_sector << Qt::endl
+          << "    end:" << partition->end_sector << Qt::endl
+          << "    sector size:" << partition->sector_size << Qt::endl
+          << "    flags:" << partition->flags << Qt::endl
+          << "    }" << Qt::endl;
   return debug;
 }
 

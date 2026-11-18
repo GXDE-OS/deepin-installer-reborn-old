@@ -24,18 +24,18 @@ DynamicDiskWarningFrame::DynamicDiskWarningFrame(QWidget* parent)
     m_warningTips->setFixedWidth(310);
 
     QVBoxLayout* layout = new QVBoxLayout;
-    layout->setMargin(0);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(10);
 
     layout->addStretch();
 
-    m_diskListLayout->setMargin(0);
+    m_diskListLayout->setContentsMargins(0, 0, 0, 0);
     m_diskListLayout->setSpacing(30);
 
     layout->addLayout(m_diskListLayout);
 
     QHBoxLayout* warningLayout = new QHBoxLayout;
-    warningLayout->setMargin(0);
+    warningLayout->setContentsMargins(0, 0, 0, 0);
     warningLayout->setSpacing(10);
 
     QLabel* warningIcon = new QLabel;
@@ -75,7 +75,7 @@ void DynamicDiskWarningFrame::setDevice(const QList<Device::Ptr> list)
 
     for (const Device::Ptr device : list) {
         QVBoxLayout* diskLayout = new QVBoxLayout;
-        diskLayout->setMargin(0);
+        diskLayout->setContentsMargins(0, 0, 0, 0);
         diskLayout->setSpacing(0);
 
         QLabel* diskLbl = new QLabel;

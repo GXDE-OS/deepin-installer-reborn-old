@@ -86,7 +86,7 @@ NetworkFrame::NetworkFrame(QWidget *parent)
     }
 
     QVBoxLayout *layout = new QVBoxLayout;
-    layout->setMargin(0);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(10);
 
     QLabel *logo_label = new QLabel;
@@ -170,7 +170,7 @@ void NetworkFrame::saveConf()
                 macAddress = interfaces.first().hardwareAddress();
             }
 
-            stream << "[connection]" << endl;
+            stream << "[connection]" << Qt::endl;
             std::list<std::pair<QString, QString>> pairList{
                 std::pair<QString, QString>("id", "connect1"),
                 std::pair<QString, QString>(
@@ -183,12 +183,12 @@ void NetworkFrame::saveConf()
             };
 
             for (std::pair<QString, QString> pair : pairList) {
-                stream << pair.first << "=" << pair.second << endl;
+                stream << pair.first << "=" << pair.second << Qt::endl;
             }
         }
 
         {
-            stream << "[ipv4]" << endl;
+            stream << "[ipv4]" << Qt::endl;
             std::list<std::pair<QString, QString>> pairList{
                 std::pair<QString, QString>("address1",
                                             QString("%1/%2,%3;")
@@ -204,7 +204,7 @@ void NetworkFrame::saveConf()
             };
 
             for (std::pair<QString, QString> pair : pairList) {
-                stream << pair.first << "=" << pair.second << endl;
+                stream << pair.first << "=" << pair.second << Qt::endl;
             }
         }
 

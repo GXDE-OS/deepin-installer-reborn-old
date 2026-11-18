@@ -45,7 +45,7 @@ void LanguageFrame::writeConf() {
 }
 
 void LanguageFrame::initUI() {
-    m_frame_layout->setMargin(0);
+    m_frame_layout->setContentsMargins(0, 0, 0, 0);
     m_frame_layout->addWidget(m_select_language_frame);
     m_frame_layout->addWidget(m_user_license_frame);
 

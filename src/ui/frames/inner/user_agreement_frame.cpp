@@ -63,7 +63,7 @@ void UserAgreementFrame::initUI()
     QWidget *sourceWidget = new QWidget;
     sourceWidget->setObjectName("sourceWidget");
     QHBoxLayout *sourceLayout = new QHBoxLayout;
-    sourceLayout->setMargin(0);
+    sourceLayout->setContentsMargins(0, 0, 0, 0);
     sourceLayout->setSpacing(0);
     sourceLayout->addWidget(m_sourceLbl, 0, Qt::AlignTop | Qt::AlignHCenter);
     sourceLayout->addStretch();

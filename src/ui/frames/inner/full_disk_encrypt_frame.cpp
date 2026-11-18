@@ -40,7 +40,7 @@ Full_Disk_Encrypt_frame::Full_Disk_Encrypt_frame(QWidget *parent)
     , m_nextBtn(new NavButton)
     , m_errTip(new SystemInfoTip(this))
 {
-    m_layout->setMargin(0);
+    m_layout->setContentsMargins(0, 0, 0, 0);
     m_layout->setSpacing(10);
 
     m_errTip->hide();
@@ -64,7 +64,7 @@ Full_Disk_Encrypt_frame::Full_Disk_Encrypt_frame(QWidget *parent)
     m_layout->addWidget(diskLbl, 0, Qt::AlignHCenter);
 
     QVBoxLayout *diskInfoLayout = new QVBoxLayout;
-    diskInfoLayout->setMargin(0);
+    diskInfoLayout->setContentsMargins(0, 0, 0, 0);
     diskInfoLayout->setSpacing(0);
     diskInfoLayout->addWidget(m_devicePathLbl, 0, Qt::AlignHCenter);
     diskInfoLayout->addSpacing(6);

@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 #include <QDebug>
-#include <QRegExp>
+#include <QRegularExpression>
 
 #include "base/file_util.h"
 
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
     qWarning() << "Output file not set, use stdout instead!";
   }
 
-  QRegExp progress_reg("(\\d{1,3})%");
+  const QRegularExpression progress_reg("(\\d{1,3})%");
   QString q_str_line;
   QString progress;
 
@@ -59,8 +59,9 @@ int main(int argc, char* argv[]) {
   while (num_read > 0) {
     q_str_line = buf;
 
-    if (progress_reg.indexIn(q_str_line, 0) != -1) {
-      progress = progress_reg.cap(1);
+    const QRegularExpressionMatch match(progress_reg.match(q_str_line));
+    if (match.hasMatch()) {
+      progress = match.captured(1);
       WriteProgress(output_file, progress);
     }
 

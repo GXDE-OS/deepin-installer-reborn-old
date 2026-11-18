@@ -413,10 +413,10 @@ void Operation::substitute(PartitionList& partitions) const {
 }
 
 QDebug& operator<<(QDebug& debug, const Operation& operation) {
-    debug << "Operation: {" << endl
-    << "    type: " << operation.type << endl
-    << "    opri_partion: " << operation.orig_partition << endl
-    << "    new_partition: " << operation.new_partition << endl
+    debug << "Operation: {" << Qt::endl
+    << "    type: " << operation.type << Qt::endl
+    << "    opri_partion: " << operation.orig_partition << Qt::endl
+    << "    new_partition: " << operation.new_partition << Qt::endl
     << "}";
     return debug;
 }

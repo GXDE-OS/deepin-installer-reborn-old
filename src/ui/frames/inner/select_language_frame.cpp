@@ -146,7 +146,7 @@ void SelectLanguageFrame::initUI() {
   license_label_->installEventFilter(this);
 
   QHBoxLayout *license_layout = new QHBoxLayout;
-  license_layout->setMargin(0);
+  license_layout->setContentsMargins(0, 0, 0, 0);
   license_layout->setSpacing(5);
   license_layout->addStretch();
   license_layout->addWidget(accept_license_);

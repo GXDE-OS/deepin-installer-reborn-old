@@ -43,7 +43,7 @@ ControlPlatformFrame::ControlPlatformFrame(QWidget* parent)
     }
 
     QVBoxLayout* layout = new QVBoxLayout;
-    layout->setMargin(0);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(10);
 
     m_regionBox->setModel(m_regionModel);
@@ -61,7 +61,7 @@ ControlPlatformFrame::ControlPlatformFrame(QWidget* parent)
     layout->addStretch();
 
     QHBoxLayout* ipInfo = new QHBoxLayout;
-    ipInfo->setMargin(0);
+    ipInfo->setContentsMargins(0, 0, 0, 0);
     ipInfo->setSpacing(0);
 
     ipInfo->addStretch();
@@ -124,8 +124,7 @@ bool ControlPlatformFrame::event(QEvent* event)
 
 void ControlPlatformFrame::onNetworkFinished(QNetworkReply* reply)
 {
-    QTextCodec*   codec = QTextCodec::codecForName("utf8");
-    const QString all   = codec->toUnicode(reply->readAll());
+    const QString all = QString::fromUtf8(reply->readAll());
     reply->deleteLater();
 
     QJsonArray array = QJsonDocument::fromJson(all.toUtf8()).array();
