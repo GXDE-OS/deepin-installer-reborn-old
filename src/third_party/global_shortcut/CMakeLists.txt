@@ -1,9 +1,10 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.10.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.18.0)
 
 PROJECT(GlobalShortcut)
 
-find_package(Qt5Core REQUIRED)
-find_package(Qt5X11Extras REQUIRED)
+# Qt 6 dropped Qt5X11Extras: the X11 display handle is obtained through the
+# QNativeInterface::QX11Application platform integration instead.
+find_package(Qt6 REQUIRED COMPONENTS Core Gui)
 find_package(PkgConfig REQUIRED)
 
 pkg_search_module(X11 REQUIRED x11)
@@ -18,7 +19,8 @@ SET(LIB_FILES
     )
 
 set(LINK_LIBS
-    Qt5::X11Extras
+    Qt6::Core
+    Qt6::Gui
     ${X11_LIBRARIES}
     ${X11EXT_LIBRARIES}
     )

@@ -2,7 +2,8 @@
 #set(CMAKE_C_COMPILER  /usr/bin/clang)
 #set(CMAKE_CXX_COMPILER  /usr/bin/clang++)
 
-set(CMAKE_CXX_STANDARD 11)
+# Qt 6 requires C++17.
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -78,15 +79,8 @@ else()
 endif()
 
 find_package(PkgConfig REQUIRED)
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Network REQUIRED)
-find_package(Qt5Widgets REQUIRED)
-find_package(Qt5X11Extras REQUIRED)
-find_package(Qt5Xml REQUIRED)
-find_package(Qt5LinguistTools)
-find_package(Qt5Svg REQUIRED)
-find_package(Qt5DBus REQUIRED)
+find_package(Qt6 6.6 REQUIRED COMPONENTS
+             Core Gui Network Widgets Xml Svg DBus Core5Compat LinguistTools)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -463,15 +457,18 @@ set(UNITTEST_FILES
     ui/delegates/timezone_map_util_test.cpp
     )
 
-set(QtCore_LIBS Qt5::Core)
+set(QtCore_LIBS
+    Qt6::Core
+    Qt6::Core5Compat
+    )
 set(Qt_LIBS
-    Qt5::Gui
-    Qt5::Network
-    Qt5::Widgets
-    Qt5::X11Extras
-    Qt5::Xml
-    Qt5::Svg
-    Qt5::DBus
+    Qt6::Gui
+    Qt6::Network
+    Qt6::Widgets
+    Qt6::Xml
+    Qt6::Svg
+    Qt6::DBus
+    Qt6::Core5Compat
     )
 
 set(LINK_LIBS
@@ -496,7 +493,7 @@ file(GLOB INSTALLER_TRANSLATION_TS
      ${CMAKE_SOURCE_DIR}/i18n/installer-*.ts)
 set_source_files_properties(${INSTALLER_TRANSLATION_TS}
                             PROPERTIES OUTPUT_LOCATION ${CMAKE_BINARY_DIR}/i18n)
-qt5_add_translation(INSTALLER_TRANSLATION_QM ${INSTALLER_TRANSLATION_TS})
+qt6_add_translation(INSTALLER_TRANSLATION_QM ${INSTALLER_TRANSLATION_TS})
 add_custom_target(installer-qm-update DEPENDS ${INSTALLER_TRANSLATION_QM})
 
 add_executable(deepin-installer
