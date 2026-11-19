@@ -29,7 +29,6 @@ set(SRCS
     lib/Filter.cpp
     lib/History.cpp
     lib/HistorySearch.cpp
-    lib/Hyperlink.cpp
     lib/KeyboardTranslator.cpp
     lib/konsole_wcwidth.cpp
     lib/kprocess.cpp
@@ -54,7 +53,6 @@ set(HDRS
     lib/Emulation.h
     lib/Filter.h
     lib/HistorySearch.h
-    lib/Hyperlink.h
     lib/kprocess.h
     lib/kptydevice.h
     lib/kptyprocess.h

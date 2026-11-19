@@ -36,7 +36,7 @@ IconButton::IconButton(const QString& normal_icon,
   this->setIcon(normal_icon_);
 }
 
-void IconButton::enterEvent(QEvent* event) {
+void IconButton::enterEvent(QEnterEvent* event) {
   this->setIcon(hover_icon_);
   FlatButton::enterEvent(event);
 }

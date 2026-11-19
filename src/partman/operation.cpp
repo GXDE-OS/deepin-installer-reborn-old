@@ -18,6 +18,7 @@
 #include "partman/operation.h"
 
 #include <QDebug>
+#include <QObject>
 #include <memory>
 
 #include "partman/libparted_util.h"

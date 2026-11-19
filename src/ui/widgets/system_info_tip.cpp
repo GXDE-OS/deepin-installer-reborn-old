@@ -66,7 +66,7 @@ void SystemInfoTip::setText(const QString& text) {
 
   // Width of label is based on its content.
   const QFontMetrics metrics(label_->font());
-  const int content_width = metrics.width(text);
+  const int content_width = metrics.horizontalAdvance(text);
   // Set world-wrap flag of label based on its content.
   if (content_width < kMaximumLabelWidth) {
     label_->setWordWrap(false);

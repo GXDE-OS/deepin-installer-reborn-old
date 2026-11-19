@@ -23,7 +23,7 @@ AdvancedPartitionErrorLabel::AdvancedPartitionErrorLabel(QWidget* parent)
     : QLabel(parent), state_(AdvancedValidateState::Ok) {
 }
 
-void AdvancedPartitionErrorLabel::enterEvent(QEvent* event) {
+void AdvancedPartitionErrorLabel::enterEvent(QEnterEvent* event) {
   QLabel::enterEvent(event);
   emit this->entered();
 }
