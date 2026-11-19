@@ -11,5 +11,6 @@ upstream:
   pkg-config file, no install/export of the library itself, no example or
   python bindings, no translation build (SEARCHBAR .ts files dropped).
 * kb-layouts/ and color-schemes/ are installed to
-  ${CMAKE_INSTALL_DATADIR}/qtermwidget6 at runtime instead of being bundled
-  as .qrc resources.
+  ${CMAKE_INSTALL_DATADIR}/deepin-installer/qtermwidget6 at runtime instead of
+  being bundled as .qrc resources. The private location avoids colliding with
+  the system qtermwidget-data package.

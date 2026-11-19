@@ -68,9 +68,12 @@ set(HDRS
 set(UI_FILES lib/SearchBar.ui)
 
 # Data dirs, kept in sync with the install rules below.
-set(KB_LAYOUT_DIR "${CMAKE_INSTALL_FULL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/kb-layouts")
-set(COLORSCHEMES_DIR "${CMAKE_INSTALL_FULL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/color-schemes")
-set(TRANSLATIONS_DIR "${CMAKE_INSTALL_FULL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/translations")
+# These files are private to the installer: installing them into the shared
+# ${CMAKE_INSTALL_DATADIR}/qtermwidget6 would conflict with qtermwidget-data.
+set(QTERMWIDGET_DATA_DIR "${CMAKE_INSTALL_DATADIR}/deepin-installer/${QTERMWIDGET_LIBRARY_NAME}")
+set(KB_LAYOUT_DIR "${CMAKE_INSTALL_FULL_DATADIR}/deepin-installer/${QTERMWIDGET_LIBRARY_NAME}/kb-layouts")
+set(COLORSCHEMES_DIR "${CMAKE_INSTALL_FULL_DATADIR}/deepin-installer/${QTERMWIDGET_LIBRARY_NAME}/color-schemes")
+set(TRANSLATIONS_DIR "${CMAKE_INSTALL_FULL_DATADIR}/deepin-installer/${QTERMWIDGET_LIBRARY_NAME}/translations")
 
 add_definitions("-DHAVE_POSIX_OPENPT" "-DHAVE_SYS_TIME_H")
 CHECK_FUNCTION_EXISTS(updwtmpx HAVE_UPDWTMPX)
@@ -111,10 +114,10 @@ endif()
 
 # Terminal data files used by the widget at runtime.
 install(DIRECTORY lib/kb-layouts/
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/kb-layouts"
+        DESTINATION "${QTERMWIDGET_DATA_DIR}/kb-layouts"
         FILES_MATCHING PATTERN "*.keytab"
         )
 install(DIRECTORY lib/color-schemes/
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/${QTERMWIDGET_LIBRARY_NAME}/color-schemes"
+        DESTINATION "${QTERMWIDGET_DATA_DIR}/color-schemes"
         FILES_MATCHING PATTERN "*.*schem*"
         )
