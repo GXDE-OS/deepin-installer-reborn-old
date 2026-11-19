@@ -21,7 +21,7 @@ class KeyboardEventFilter : public QAbstractNativeEventFilter {
   friend class GlobalShortcut;
 
   bool nativeEventFilter(const QByteArray& eventType, void* message,
-                         long* result) override;
+                         qintptr* result) override;
 
 
  private:

@@ -119,6 +119,13 @@ set(BASE_FILES
     base/thread_util.h
     )
 
+# X11Info requires Qt6::Gui and X11, so it is only added to the executables
+# that use it (they link ${LINK_LIBS}).
+set(X11_INFO_FILES
+    base/x11_info.cpp
+    base/x11_info.h
+    )
+
 set(OEM_FILES
 
     oem/models/oem_settings_item.cpp
@@ -502,6 +509,7 @@ add_executable(deepin-installer
                ui/main_window.h
 
                ${BASE_FILES}
+               ${X11_INFO_FILES}
                ${PARTMAN_FILES}
                ${SERVICE_FILES}
                ${SYSINFO_FILES}
@@ -533,6 +541,7 @@ add_executable(deepin-installer-first-boot
                ui/first_boot_setup_window.h
 
                ${BASE_FILES}
+               ${X11_INFO_FILES}
                ${PARTMAN_FILES}
                ${SERVICE_FILES}
                ${SYSINFO_FILES}
@@ -546,6 +555,7 @@ target_link_libraries(deepin-installer-first-boot
 add_executable(deepin-installer-user-form
                app/deepin_installer_user_form.cpp
                ${BASE_FILES}
+               ${X11_INFO_FILES}
 
                service/settings_manager.cpp
                service/settings_manager.h

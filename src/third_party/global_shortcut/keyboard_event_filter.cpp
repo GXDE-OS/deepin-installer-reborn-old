@@ -48,7 +48,7 @@ KeyboardEventFilter::~KeyboardEventFilter() {
 
 // Filters native X event
 bool KeyboardEventFilter::nativeEventFilter(const QByteArray& event_type,
-                                            void* message, long* result) {
+                                            void* message, qintptr* result) {
   Q_UNUSED(result);
   if (event_type == "xcb_generic_event_t") {
     xcb_generic_event_t* event = static_cast<xcb_generic_event_t*>(message);
